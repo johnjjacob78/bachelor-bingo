@@ -377,7 +377,11 @@
       <div class="ph" data-i="${i}"><img src="${h(p.thumb || p.url)}" loading="lazy" alt=""><div class="cap"><b>${h(p.player)}</b>${h(p.clue)}<br><span>w/ ${h(p.witness)} · ${fmt(p.at)}</span></div></div>`).join("");
     document.querySelectorAll(".ph").forEach((el) => el.onclick = () => {
       const p = d.items[+el.dataset.i];
-      $("#light").innerHTML = `<img src="${h(p.url)}" alt=""><p><b>${h(p.player)}</b> — ${h(p.clue)}<br>with ${h(p.witness)} · ${fmt(p.at)}</p>`;
+      // Show the small thumbnail instantly, then swap in the full-resolution photo once it has loaded.
+      $("#light").innerHTML = `<img src="${h(p.thumb || p.url)}" alt="" style="min-width:min(100%,640px)"><p><b>${h(p.player)}</b> — ${h(p.clue)}<br>with ${h(p.witness)} · ${fmt(p.at)}<span id="hires"> · loading full size…</span></p>`;
+      const full = new Image();
+      full.onload = () => { const im = $("#light img"); if (im && $("#light").classList.contains("open")) { im.src = p.url; const s = $("#hires"); if (s) s.remove(); } };
+      full.src = p.url;
       $("#light").classList.add("open");
     });
   }
