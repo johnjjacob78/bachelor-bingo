@@ -1,3 +1,4 @@
+import { DurableObject } from "cloudflare:workers";
 import APP_HTML from "./app.html";
 import { PLAYERS, ALIASES, CLUES } from "./seed.js";
 import { clearSession, readSession, claimedPlayers, releasePlayer, claimPlayer, AuthError, rebuildClaimIndex } from "./auth.js";
@@ -187,21 +188,42 @@ function isHost(request, env) {
 
 // ---------- routes ----------
 
+// ---------- storage ----------
+// All game state (config, boards, claims, marks, bingos) lives in ONE Durable Object, "game".
+// Its storage is strongly consistent and the object handles requests one at a time between
+// awaits, so reads always see the latest write and read-modify-write updates can't be lost.
+// (Workers KV, used before, is eventually consistent: on the live site 3 of 4 rapid marks were
+// lost, and sign-ins flickered for up to a minute after a claim.)
+// The handler code still talks to `env.KV`; inside the object that's an adapter over DO storage.
+// Every response reports its storage cost in an x-kv header.
+export class Game extends DurableObject {
+  async fetch(request) {
+    const s = this.ctx.storage, n = { r: 0, w: 0 };
+    const KV = {
+      get: async (k, type) => {
+        n.r++;
+        const v = await s.get(k);
+        if (v === undefined) return null;
+        return type === "json" && typeof v === "string" ? JSON.parse(v) : v;
+      },
+      put: async (k, v) => { n.w++; await s.put(k, v); },
+      delete: async (k) => { n.w++; await s.delete(k); },
+    };
+    const res = await worker.handle(request, { ...this.env, KV });
+    const out = new Response(res.body, res);
+    out.headers.set("x-kv", `r=${n.r} w=${n.w}`);
+    return out;
+  }
+}
+
 const worker = {
-  // Counts KV reads/writes per request and reports them in an x-kv header, so tests can hold the
-  // free-tier budget (100k reads / 1k writes a day) in check.
-  async fetch(request, rawEnv) {
-    const n = { r: 0, w: 0 };
-    const KV = rawEnv.KV;
-    const env = { ...rawEnv, KV: {
-      get: (...a) => { n.r++; return KV.get(...a); },
-      put: (...a) => { n.w++; return KV.put(...a); },
-      delete: (...a) => { n.w++; return KV.delete(...a); },
-      list: (...a) => { n.r++; return KV.list(...a); },
-    } };
-    const res = await worker.handle(request, env);
-    try { res.headers.set("x-kv", `r=${n.r} w=${n.w}`); return res; }
-    catch { const r2 = new Response(res.body, res); r2.headers.set("x-kv", `r=${n.r} w=${n.w}`); return r2; }
+  async fetch(request, env) {
+    const path = new URL(request.url).pathname;
+    // The page and photos don't touch game state: serve them straight from the Worker.
+    if (request.method === "GET" && (path === "/" || path === "/index.html" || path.startsWith("/photo/"))) {
+      return worker.handle(request, env);
+    }
+    return env.GAME.get(env.GAME.idFromName("game")).fetch(request);
   },
 
   async handle(request, env) {
@@ -300,7 +322,7 @@ const worker = {
         const me = await readSession(request, env);
         const host = isHost(request, env);
         const player = host && form.get("player") ? String(form.get("player")) : me;
-        if (!player) return bad("Sign in with Face ID first.", 401);
+        if (!player) return bad("Tap your name first.", 401);
         const id = String(form.get("clue") || "");
         const witness = String(form.get("witness") || "");
         const photo = form.get("photo");
@@ -321,12 +343,20 @@ const worker = {
           thumbKey = key.replace(/\.(\w+)$/, "-thumb.jpg");
           await env.PHOTOS.put(thumbKey, thumb.stream(), { httpMetadata: { contentType: "image/jpeg" } });
         }
-        marks[id] = { key, thumb: thumbKey, witness, at: Date.now() };
-        await env.KV.put(marksKey(player), JSON.stringify(marks));
+        // The photo upload above lets other requests run in the meantime (e.g. this player's next mark),
+        // so re-read marks now. From here to the write there is no outside I/O, so nothing can interleave.
+        const latest = await loadMarks(env, player);
+        if (latest[id]) {
+          await env.PHOTOS.delete(key); if (thumbKey) await env.PHOTOS.delete(thumbKey);
+          return bad("Already marked.");
+        }
+        latest[id] = { key, thumb: thumbKey, witness, at: Date.now() };
+        await env.KV.put(marksKey(player), JSON.stringify(latest));
+        const marksNow = latest;
         let bingo = await env.KV.get(bingoKey(player), "json");
         let fresh = false;
         if (!bingo) {
-          const line = findBingo(boards.boards[player], marks);
+          const line = findBingo(boards.boards[player], marksNow);
           if (line) {
             bingo = { at: Date.now(), line };
             await env.KV.put(bingoKey(player), JSON.stringify(bingo));
@@ -334,7 +364,7 @@ const worker = {
             fresh = true;
           }
         }
-        return json({ ok: true, mark: marks[id], bingo, newBingo: fresh });
+        return json({ ok: true, mark: marksNow[id], bingo, newBingo: fresh });
       }
 
       if (method === "DELETE" && path === "/api/mark") {
@@ -342,7 +372,7 @@ const worker = {
         const host = isHost(request, env);
         const me = await readSession(request, env);
         const player = host && url.searchParams.get("player") ? url.searchParams.get("player") : (me || "");
-        if (!player) return bad("Sign in with Face ID first.", 401);
+        if (!player) return bad("Tap your name first.", 401);
         const id = url.searchParams.get("clue") || "";
         if (cfg.locked && !host) return bad("The game is locked right now.", 423);
         if (!cfg.players.includes(player)) return bad("Unknown player.");

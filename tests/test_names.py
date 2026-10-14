@@ -10,6 +10,14 @@ from playwright.sync_api import sync_playwright
 
 B = os.environ.get("BINGO_URL", "http://localhost:8787")
 PIN = os.environ.get("HOST_PIN", "ribeye")
+
+# --- network setup: lets the suites run against the live site too ---
+import urllib.request as _ur
+_op = _ur.build_opener(); _op.addheaders = [("User-Agent", "Mozilla/5.0 (bingo-tests)")]  # Cloudflare blocks Python's default UA
+_ur.install_opener(_op)
+_PROXY = os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy")
+LAUNCH_KW = {"proxy": {"server": _PROXY}} if _PROXY and not B.startswith("http://localhost") else {}
+CTX_KW = {"ignore_https_errors": True} if LAUNCH_KW else {}
 results = []
 
 
@@ -42,6 +50,20 @@ def claim_api(player):
 def owner(cookie):
     """Whose board this cookie opens, or None."""
     return call("/api/state", pin=False, cookie=cookie)[1].get("player")
+
+
+def mark_api(player, clue, witness):
+    """Host-marks a square for a player, with a tiny photo. Returns HTTP status."""
+    import io
+    from PIL import Image
+    buf = io.BytesIO(); Image.new("RGB", (32, 32), (200, 50, 50)).save(buf, "JPEG")
+    bd = b"--X\r\n"
+    for k, v in [("player", player), ("clue", clue), ("witness", witness)]:
+        bd += f'Content-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n--X\r\n'.encode()
+    bd += b'Content-Disposition: form-data; name="photo"; filename="p.jpg"\r\nContent-Type: image/jpeg\r\n\r\n' + buf.getvalue() + b"\r\n--X--\r\n"
+    req = urllib.request.Request(B + "/api/mark", data=bd, headers={"content-type": "multipart/form-data; boundary=X", "x-pin": PIN}, method="POST")
+    try: return urllib.request.urlopen(req).status
+    except urllib.error.HTTPError as e: return e.code
 
 
 def kv(h): r, w = h["x-kv"].split(); return int(r[2:]), int(w[2:])
@@ -111,6 +133,30 @@ def main():
     call("/api/host/config", {"players": cfg["players"]})
     check("players: re-added player shows correct claim", claimed()["Jay"] is True)
 
+    # consistency: nothing read stale, nothing lost (the live KV version lost 3 of 4 rapid marks)
+    stable = [owner(ck3) for _ in range(12)]
+    check("consistency: a fresh sign-in stays valid on every request", all(o == "Jay" for o in stable), str(stable))
+    idx = [claimed()["Jay"] for _ in range(6)]
+    check("consistency: name list shows Jay taken on every request", all(idx), str(idx))
+    call("/api/host/reset", {"player": "Kaushik"})
+    ids = [c["id"] for c in call("/api/state?player=Kaushik")[1]["board"]]
+    sts = [mark_api("Kaushik", cid, "John") for cid in ids[:4]]
+    got = len(call("/api/host/config")[1]["marks"]["Kaushik"])
+    check("consistency: 4 marks in quick succession all saved", sts == [200] * 4 and got == 4, f"{sts} saved={got}")
+    outs = []
+    ts = [threading.Thread(target=lambda c=c: outs.append(mark_api("Kaushik", c, "Jay"))) for c in ids[4:10]]
+    [t.start() for t in ts]; [t.join() for t in ts]
+    got = len(call("/api/host/config")[1]["marks"]["Kaushik"])
+    check("consistency: 6 marks at the same instant all saved", outs.count(200) == 6 and got == 10, f"{outs} saved={got}")
+    dup = []
+    ts = [threading.Thread(target=lambda: dup.append(mark_api("Kaushik", ids[10], "Jay"))) for _ in range(4)]
+    [t.start() for t in ts]; [t.join() for t in ts]
+    km = call("/api/host/config")[1]["marks"]["Kaushik"]
+    check("consistency: same square marked 4x at once -> saved once", dup.count(200) == 1 and len(km) == 11, f"{sorted(dup)} saved={len(km)}")
+    photos = [p for p in call("/api/photos", pin=False)[1]["items"] if p["player"] == "Kaushik"]
+    check("consistency: photo wall shows each mark exactly once", len(photos) == 11, str(len(photos)))
+    call("/api/host/reset", {"player": "Kaushik"})
+
     # budget
     st, d, h = call("/api/state", pin=False, cookie=ck3, raw=True)
     check("budget: signed-in board refresh <= 6 KV reads, 0 writes", kv(h)[0] <= 6 and kv(h)[1] == 0, h["x-kv"])
@@ -125,10 +171,10 @@ def main():
 
     # ---------------- Phones ----------------
     with sync_playwright() as p:
-        br = p.chromium.launch()
+        br = p.chromium.launch(**LAUNCH_KW)
 
         def phone(dialog="accept"):
-            ctx = br.new_context(viewport={"width": 390, "height": 844})
+            ctx = br.new_context(viewport={"width": 390, "height": 844}, **CTX_KW)
             pg = ctx.new_page(); errs = []
             pg.on("pageerror", lambda e: errs.append(str(e)))
             pg.on("dialog", lambda d: d.accept() if dialog == "accept" else d.dismiss())
