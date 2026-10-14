@@ -157,6 +157,22 @@ def main():
     check("consistency: photo wall shows each mark exactly once", len(photos) == 11, str(len(photos)))
     call("/api/host/reset", {"player": "Kaushik"})
 
+    # standings: closeness to bingo beats raw mark count
+    kb = [c["id"] for c in call("/api/state?player=Kaushik")[1]["board"]]
+    rb = [c["id"] for c in call("/api/state?player=Rahul")[1]["board"]]
+    for i in (0, 1, 2): mark_api("Kaushik", kb[i], "John")            # 3 in the top row
+    for i in (0, 6, 11, 13): mark_api("Rahul", rb[i], "John")         # 4 marks, no two in any line
+    rows = call("/api/leaderboard", pin=False)[1]["rows"]
+    by = {r["player"]: r for r in rows}
+    order = [r["player"] for r in rows]
+    check("standings: 3-in-a-line counts as best=3, one line close", by["Kaushik"]["best"] == 3 and by["Kaushik"]["close"] == 1, str(by["Kaushik"]))
+    check("standings: 4 scattered marks counts as best=1", by["Rahul"]["best"] == 1 and by["Rahul"]["marked"] == 4, str(by["Rahul"]))
+    check("standings: closer to bingo ranks higher than more marks", order.index("Kaushik") < order.index("Rahul"), str(order[:4]))
+    mark_api("Kaushik", kb[4], "John"); mark_api("Kaushik", kb[8], "John")   # col 0: cells 0,4,8 -> second line at 3
+    by = {r["player"]: r for r in call("/api/leaderboard", pin=False)[1]["rows"]}
+    check("standings: two lines one away -> close=2", by["Kaushik"]["close"] == 2, str(by["Kaushik"]))
+    call("/api/host/reset", {"player": "Kaushik"}); call("/api/host/reset", {"player": "Rahul"})
+
     # budget
     st, d, h = call("/api/state", pin=False, cookie=ck3, raw=True)
     check("budget: signed-in board refresh <= 6 KV reads, 0 writes", kv(h)[0] <= 6 and kv(h)[1] == 0, h["x-kv"])

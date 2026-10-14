@@ -167,7 +167,9 @@ with sync_playwright() as p:
     rows = A.locator("#standings .row").count()
     check("standings: 14 rows", rows == 14)
     check("standings: John first with BINGO pill", A.locator("#standings .row").first.inner_text().startswith("1") and "BINGO" in A.locator("#standings .row").first.inner_text())
-    check("standings: John shows 4/16", "4/16" in A.locator("#standings .row").first.inner_text())
+    top = A.locator("#standings .row").first.inner_text()
+    check("standings: John shows 4/4 and 4 marked", "4/4" in top and "4 marked" in top, top)
+    check("standings: winner's line bar is full", A.locator("#standings .row").first.locator(".bar.line4 i.on").count() == 4)
     A.screenshot(path=f"{SHOTS}/t_standings.png")
 
     # ---------- 9. Photos ----------
@@ -240,7 +242,7 @@ with sync_playwright() as p:
     Bp.reload(); Bp.wait_for_selector("#names button")
     check("host: released Jay is signed out on next load", Bp.evaluate("document.querySelector('.view.active').id") == "view-pick")
     # reset John
-    A.click("[data-reset='John']"); A.wait_for_function("document.querySelector(\"[data-reset='John']\").closest('.row').innerText.includes('0/16')")
+    A.click("[data-reset='John']"); A.wait_for_function("document.querySelector(\"[data-reset='John']\").closest('.row').innerText.includes('0 marked')")
     check("host: reset John clears marks and bingo", "BINGO" not in A.locator("[data-reset='John']").locator("xpath=ancestor::div[contains(@class,'row')]").inner_text())
     # players edit
     A.fill("#players", "\n".join(cfg["cfg"]["players"] + ["Zed"])); A.click("#save"); A.wait_for_function("document.querySelector('#players').value.includes('Zed')")

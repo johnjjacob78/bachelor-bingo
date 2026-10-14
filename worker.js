@@ -169,13 +169,18 @@ function leaderboard(cfg, boards, marks, bingos) {
     const board = boards.boards[p] || [];
     const m = marks[p] || {};
     const count = board.filter((id) => id && m[id]).length;
-    return { player: p, marked: count, bingoAt: bingos[p]?.at || null, line: bingos[p]?.line || null };
+    // How close to bingo: the most marked squares in any single row, column or diagonal (out of SIZE).
+    const best = Math.max(0, ...LINES.map((line) => line.filter((i) => board[i] && m[board[i]]).length));
+    // How many lines are one square away, so "3/4" twice ranks above "3/4" once.
+    const close = LINES.filter((line) => line.filter((i) => board[i] && m[board[i]]).length === SIZE - 1).length;
+    return { player: p, marked: count, best, close, bingoAt: bingos[p]?.at || null, line: bingos[p]?.line || null };
   });
+  // Bingos first (earliest wins), then closest to bingo, then most marks overall.
   rows.sort((a, b) => {
     if (a.bingoAt && b.bingoAt) return a.bingoAt - b.bingoAt;
     if (a.bingoAt) return -1;
     if (b.bingoAt) return 1;
-    return b.marked - a.marked || a.player.localeCompare(b.player);
+    return b.best - a.best || b.close - a.close || b.marked - a.marked || a.player.localeCompare(b.player);
   });
   return rows;
 }
