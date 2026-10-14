@@ -102,7 +102,6 @@
   .names button { background: var(--panel2); color: var(--text); padding: 14px; border-radius: 12px; font-weight: 600; font-size: 15px; }
   .names button.taken { color: var(--muted); }
   .names button.taken::after { content: " 🔒"; }
-  .names button.taken.pw::after { content: " 🔑"; }
 
   /* host */
   .clue-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: start; padding: 8px 0; border-bottom: 1px solid var(--line); }
@@ -127,16 +126,11 @@
 
   <!-- pick name -->
   <section class="view" id="view-pick">
-    <div class="card" id="returning" style="display:none">
-      <button class="btn" id="signin" style="margin:0">🔒 Sign in with Face ID</button>
-      <p class="hint" style="text-align:center">Already set up on this phone? Tap that.</p>
-    </div>
     <div class="card">
       <h2 style="font-size:22px">Who are you?</h2>
-      <p class="note" style="margin-top:4px">Pick your name, then lock your board with Face ID or a password so nobody else can mark your squares. Names with a lock are already taken.</p>
+      <p class="note" style="margin-top:4px">Tap your name. Your board locks to this phone, so nobody else can mark your squares. Names with a 🔒 are taken.</p>
       <div class="names" id="names"></div>
       <div class="err" id="pick-err"></div>
-      <p class="hint" id="nowebauthn" style="display:none">This browser can't do Face ID, so you'll be offered a password instead.</p>
     </div>
   </section>
 
@@ -191,35 +185,6 @@
 
   const state = { player: "", viewAs: "", data: null, view: "board", pin: sessionStorage.getItem("bingo:pin") || "", bingoSeen: localStorage.getItem("bingo:seen") || "" };
 
-  // ---- passkeys ----
-  const b64u = {
-    enc: (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""),
-    dec: (s) => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - s.length % 4) % 4)), (c) => c.charCodeAt(0)),
-  };
-  const hasPasskeys = () => !!(window.PublicKeyCredential && navigator.credentials);
-  async function registerPasskey(player) {
-    const o = await api("/api/auth/register/options", { method: "POST", body: JSON.stringify({ player }) });
-    const pk = o.publicKey;
-    pk.challenge = b64u.dec(pk.challenge); pk.user.id = b64u.dec(pk.user.id);
-    const cred = await navigator.credentials.create({ publicKey: pk });
-    return api("/api/auth/register", { method: "POST", body: JSON.stringify({
-      challengeId: o.challengeId, id: cred.id,
-      response: { clientDataJSON: b64u.enc(cred.response.clientDataJSON), attestationObject: b64u.enc(cred.response.attestationObject) },
-    }) });
-  }
-  async function loginPasskey(player) {
-    const o = await api("/api/auth/login/options", { method: "POST", body: JSON.stringify({ player: player || null }) });
-    const pk = o.publicKey;
-    pk.challenge = b64u.dec(pk.challenge);
-    pk.allowCredentials = (pk.allowCredentials || []).map((c) => ({ ...c, id: b64u.dec(c.id) }));
-    const cred = await navigator.credentials.get({ publicKey: pk });
-    return api("/api/auth/login", { method: "POST", body: JSON.stringify({
-      challengeId: o.challengeId, id: cred.id,
-      response: { clientDataJSON: b64u.enc(cred.response.clientDataJSON), authenticatorData: b64u.enc(cred.response.authenticatorData), signature: b64u.enc(cred.response.signature) },
-    }) });
-  }
-  const friendly = (e) => /NotAllowed|abort|cancel/i.test(e.name + e.message) ? "Face ID was cancelled. Try again." : e.message;
-
   // ---- fetch helpers ----
   async function api(path, opts = {}) {
     const r = await fetch(path, { ...opts, headers: { ...(opts.headers || {}), ...(state.pin ? { "x-pin": state.pin } : {}) } });
@@ -255,18 +220,12 @@
       : "";
     const sw = $("#switch"); if (sw) sw.onclick = async () => {
       if (viewing) { state.viewAs = ""; await loadBoard(); show(d.me ? "board" : "host"); return; }
+      if (!confirm(`Sign out? This frees up ${state.player} so you (or someone else) can pick it again. Your marks stay.`)) return;
       await api("/api/auth/logout", { method: "POST" }); state.player = ""; await loadBoard(); show("pick");
     };
     // picker
-    const ok = hasPasskeys();
-    $("#nowebauthn").style.display = ok ? "none" : "block";
-    $("#returning").style.display = ok && Object.values(d.claimed).some((v) => v === "passkey" || v === "both") ? "block" : "none";
-    $("#names").innerHTML = d.players.map((p) => `<button data-p="${h(p)}" class="${d.claimed[p] ? "taken" : ""} ${d.claimed[p] === "password" ? "pw" : ""}">${h(p)}</button>`).join("");
-    document.querySelectorAll("#names button").forEach((b) => b.onclick = () => { $("#pick-err").textContent = ""; lockSheet(b.dataset.p, d.claimed[b.dataset.p]); });
-    $("#signin").onclick = async () => {
-      $("#pick-err").textContent = "";
-      try { await loginPasskey(null); await loadBoard(); show("board"); } catch (e) { $("#pick-err").textContent = friendly(e); }
-    };
+    $("#names").innerHTML = d.players.map((p) => `<button data-p="${h(p)}" class="${d.claimed[p] ? "taken" : ""}">${h(p)}</button>`).join("");
+    document.querySelectorAll("#names button").forEach((b) => b.onclick = () => { $("#pick-err").textContent = ""; claimSheet(b.dataset.p, d.claimed[b.dataset.p]); });
     if (!state.player) { if (state.view === "board") show("pick"); return; }
     renderBoard(d);
   }
@@ -291,50 +250,28 @@
     if (d.bingo && state.bingoSeen !== String(d.bingo.at)) { state.bingoSeen = String(d.bingo.at); localStorage.setItem("bingo:seen", state.bingoSeen); confetti(); }
   }
 
-  // ---- claim / sign-in sheet ----
-  function lockSheet(p, how) {
-    const pk = hasPasskeys();
-    const done = async () => { closeSheet(); await loadBoard(); show("board"); };
-    const fail = (e) => { $("#lerr").textContent = friendly(e); document.querySelectorAll("#sheet button").forEach((b) => b.disabled = false); };
-    const busy = () => document.querySelectorAll("#sheet button").forEach((b) => b.disabled = true);
-    if (!how) {
+  // ---- claim sheet ----
+  function claimSheet(p, taken) {
+    if (taken) {
       sheet(`
-        <h3>Lock your board, ${h(p)}</h3>
-        <div class="clue">Pick one. This is how you'll get back in all weekend.</div>
-        ${pk ? `<button class="btn" id="l-face">🔒 Use Face ID</button>` : ""}
-        <button class="btn ghost" id="l-pw-start">🔑 Use a password</button>
-        <div id="l-pw" style="display:none">
-          <label class="field">Choose a password</label>
-          <input type="password" id="l-pass" autocomplete="new-password" placeholder="At least 4 characters">
-          <label class="field">Type it again</label>
-          <input type="password" id="l-pass2" autocomplete="new-password">
-          <button class="btn" id="l-pw-go">Lock it</button>
-        </div>
-        <div class="err" id="lerr"></div>`);
-      const f = $("#l-face"); if (f) f.onclick = async () => { busy(); try { await registerPasskey(p); await done(); } catch (e) { fail(e); } };
-      $("#l-pw-start").onclick = () => { $("#l-pw").style.display = "block"; $("#l-pw-start").style.display = "none"; $("#l-pass").focus(); };
-      $("#l-pw-go").onclick = async () => {
-        const a = $("#l-pass").value, b = $("#l-pass2").value;
-        if (a.length < 4) return $("#lerr").textContent = "At least 4 characters.";
-        if (a !== b) return $("#lerr").textContent = "Those don't match.";
-        busy(); try { await api("/api/auth/password/register", { method: "POST", body: JSON.stringify({ player: p, password: a }) }); await done(); } catch (e) { fail(e); }
-      };
+        <h3>${h(p)} is taken</h3>
+        <div class="clue">${h(p)} is already locked to another phone. If that's you on a new phone, or someone tapped your name by mistake, ask the host to release it.</div>
+        <button class="btn ghost" id="c-close">OK</button>`);
+      $("#c-close").onclick = closeSheet;
       return;
     }
-    const usesPk = how === "passkey" || how === "both", usesPw = how === "password" || how === "both";
     sheet(`
-      <h3>Welcome back, ${h(p)}</h3>
-      <div class="clue">${usesPk && usesPw ? "Face ID or your password." : usesPk ? "This name is locked with Face ID." : "This name is locked with a password."}</div>
-      ${usesPk && pk ? `<button class="btn" id="l-face">🔒 Sign in with Face ID</button>` : ""}
-      ${usesPk && !pk ? `<p class="hint">This browser can't do Face ID. Use the phone you set it up on, or ask the host to release your name.</p>` : ""}
-      ${usesPw ? `<label class="field">Password</label><input type="password" id="l-pass" autocomplete="current-password"><button class="btn ${usesPk ? "ghost" : ""}" id="l-pw-go">Sign in</button>` : ""}
-      <p class="hint">Not you? Pick your own name instead.</p>
-      <div class="err" id="lerr"></div>`);
-    const f = $("#l-face"); if (f) f.onclick = async () => { busy(); try { await loginPasskey(p); await done(); } catch (e) { fail(e); } };
-    const g = $("#l-pw-go"); if (g) {
-      g.onclick = async () => { busy(); try { await api("/api/auth/password/login", { method: "POST", body: JSON.stringify({ player: p, password: $("#l-pass").value }) }); await done(); } catch (e) { fail(e); } };
-      $("#l-pass").onkeydown = (e) => { if (e.key === "Enter") g.click(); };
-    }
+      <h3>Are you ${h(p)}?</h3>
+      <div class="clue">This locks ${h(p)}'s board to this phone for the weekend.</div>
+      <button class="btn" id="c-yes">Yes, I'm ${h(p)}</button>
+      <button class="btn ghost" id="c-no">No, go back</button>
+      <div class="err" id="cerr"></div>`);
+    $("#c-no").onclick = closeSheet;
+    $("#c-yes").onclick = async () => {
+      $("#c-yes").disabled = true; $("#cerr").textContent = "";
+      try { await api("/api/auth/claim", { method: "POST", body: JSON.stringify({ player: p }) }); closeSheet(); await loadBoard(); show("board"); }
+      catch (e) { $("#cerr").textContent = e.message; $("#c-yes").disabled = false; await loadBoard(); }
+    };
   }
 
   // ---- cell sheet ----
@@ -468,8 +405,8 @@
       </div>
       <div class="card">
         <h3 style="font-size:17px">Standings</h3>
-        ${d.leaderboard.map((r) => `<div class="row" style="flex-wrap:wrap"><div class="name">${h(r.player)} ${d.claimed[r.player] === "password" ? "🔑" : d.claimed[r.player] ? "🔒" : ""} ${r.bingoAt ? `<span class="pill gold">BINGO ${fmt(r.bingoAt)}</span>` : ""}</div><div class="meta">${r.marked}/15 · usable: <span class="${d.usable[r.player] < d.need ? "warn" : ""}">${d.usable[r.player]}</span></div><div style="display:flex;gap:6px;width:100%"><button class="btn sm ghost" data-viewboard="${h(r.player)}">View board</button>${d.claimed[r.player] ? `<button class="btn sm ghost" data-release="${h(r.player)}">Release lock</button>` : ""}<button class="btn sm ghost" data-reset="${h(r.player)}">Reset marks</button></div></div>`).join("")}
-        <p class="hint">🔒 = locked with Face ID, 🔑 = locked with a password. Release it if someone switches phones or forgets their password; they pick their name again.</p>
+        ${d.leaderboard.map((r) => `<div class="row" style="flex-wrap:wrap"><div class="name">${h(r.player)} ${d.claimed[r.player] ? "🔒" : ""} ${r.bingoAt ? `<span class="pill gold">BINGO ${fmt(r.bingoAt)}</span>` : ""}</div><div class="meta">${r.marked}/15 · usable: <span class="${d.usable[r.player] < d.need ? "warn" : ""}">${d.usable[r.player]}</span></div><div style="display:flex;gap:6px;width:100%"><button class="btn sm ghost" data-viewboard="${h(r.player)}">View board</button>${d.claimed[r.player] ? `<button class="btn sm ghost" data-release="${h(r.player)}">Release name</button>` : ""}<button class="btn sm ghost" data-reset="${h(r.player)}">Reset marks</button></div></div>`).join("")}
+        <p class="hint">🔒 = name is locked to a phone. Release it if someone switches phones, clears their browser, or a name got tapped by mistake; then they tap their name again.</p>
         ${short.length ? `<p class="hint warn">Short on clues (need ${d.need}): ${short.map(([p, n]) => `${h(p)} (${n})`).join(", ")}. Add clues that aren't about them.</p>` : ""}
       </div>
       <div class="card">
@@ -496,7 +433,7 @@
         <button class="btn" id="save">Save changes</button>
         <button class="btn ghost" id="regen">Save + regenerate boards</button>
         <button class="btn danger" id="resetall">Wipe all marks and photos</button>
-        <button class="btn danger" id="releaseall">Release everyone's locks</button>
+        <button class="btn danger" id="releaseall">Release every name</button>
         <div class="err" id="herr"></div>
       </div>`;
     renderClues();
@@ -504,9 +441,9 @@
     $("#save").onclick = () => hostSave(collect());
     $("#regen").onclick = () => confirm("Reshuffle every board?") && hostSave({ ...collect(), regenerate: true });
     $("#resetall").onclick = () => confirm("Delete every mark and photo for everyone?") && api("/api/host/reset", { method: "POST", body: JSON.stringify({ player: "*" }) }).then(loadHost);
-    $("#releaseall").onclick = () => confirm("Release every name? Everyone will have to pick their name and lock it again.") && api("/api/host/release", { method: "POST", body: JSON.stringify({ player: "*" }) }).then(loadHost);
+    $("#releaseall").onclick = () => confirm("Release every name? Everyone gets signed out and taps their name again. Marks stay.") && api("/api/host/release", { method: "POST", body: JSON.stringify({ player: "*" }) }).then(loadHost);
     host.querySelectorAll("[data-reset]").forEach((b) => b.onclick = () => confirm(`Reset ${b.dataset.reset}'s marks?`) && api("/api/host/reset", { method: "POST", body: JSON.stringify({ player: b.dataset.reset }) }).then(loadHost));
-    host.querySelectorAll("[data-release]").forEach((b) => b.onclick = () => confirm(`Release ${b.dataset.release}'s lock? They'll need to pick their name again.`) && api("/api/host/release", { method: "POST", body: JSON.stringify({ player: b.dataset.release }) }).then(loadHost));
+    host.querySelectorAll("[data-release]").forEach((b) => b.onclick = () => confirm(`Release ${b.dataset.release}? Their phone gets signed out and they tap their name again. Marks stay.`) && api("/api/host/release", { method: "POST", body: JSON.stringify({ player: b.dataset.release }) }).then(loadHost));
     host.querySelectorAll("[data-viewboard]").forEach((b) => b.onclick = async () => { state.viewAs = b.dataset.viewboard; await loadBoard(); show("board"); });
     host.querySelectorAll("[data-del]").forEach((b) => b.onclick = () => { const [p, id] = b.dataset.del.split("|"); api(`/api/mark?player=${encodeURIComponent(p)}&clue=${encodeURIComponent(id)}`, { method: "DELETE" }).then(loadHost); });
     $("#addclue").onclick = () => { hostCfg.clues.push({ id: null, text: "", about: [] }); renderClues(); const t = document.querySelector("#clues .clue-row:last-child textarea"); if (t) t.focus(); };
@@ -565,7 +502,7 @@
 
   // ---- boot ----
   loadBoard().then(() => show(state.player ? "board" : "pick")).catch((e) => { $("#grid").innerHTML = `<p class="note">${h(e.message)}</p>`; show("board"); });
-  setInterval(() => { if (document.hidden) return; if (state.view === "board" && state.player && !$("#sheet").classList.contains("open")) loadBoard(); if (state.view === "standings") loadStandings(); }, 20000);
+  setInterval(() => { if (document.hidden) return; if (state.view === "board" && state.player && !$("#sheet").classList.contains("open")) loadBoard(); if (state.view === "standings") loadStandings(); }, 30000);
   document.addEventListener("visibilitychange", () => { if (!document.hidden && state.view === "board") loadBoard(); });
 })();
 </script>

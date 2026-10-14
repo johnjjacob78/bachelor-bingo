@@ -1,6 +1,6 @@
 import APP_HTML from "./app.html";
 import { PLAYERS, ALIASES, CLUES } from "./seed.js";
-import { makeSession, clearSession, readSession, claimedPlayers, releasePlayer, registerOptions, registerFinish, loginOptions, loginFinish, passwordRegister, passwordLogin, AuthError } from "./auth.js";
+import { clearSession, readSession, claimedPlayers, releasePlayer, claimPlayer, AuthError, rebuildClaimIndex } from "./auth.js";
 
 const SIZE = 4;
 const CELLS = SIZE * SIZE;
@@ -140,12 +140,22 @@ async function allMarks(env, cfg) {
   return out;
 }
 
-async function allBingos(env, cfg) {
+// "idx:bingos" summarises everyone's bingo (1 read instead of 14). Per-player bingo keys are the source of
+// truth; the index is rebuilt from them whenever one changes.
+async function rebuildBingoIndex(env, cfg) {
   const out = {};
   await Promise.all(cfg.players.map(async (p) => {
     const b = await env.KV.get(bingoKey(p), "json");
     if (b) out[p] = b;
   }));
+  await env.KV.put("idx:bingos", JSON.stringify(out));
+  return out;
+}
+async function allBingos(env, cfg) {
+  const idx = await env.KV.get("idx:bingos", "json");
+  if (!idx) return rebuildBingoIndex(env, cfg);
+  const out = {};
+  for (const p of cfg.players) if (idx[p]) out[p] = idx[p];
   return out;
 }
 
@@ -179,8 +189,24 @@ function isHost(request, env) {
 
 // ---------- routes ----------
 
-export default {
-  async fetch(request, env) {
+const worker = {
+  // Counts KV reads/writes per request and reports them in an x-kv header, so tests can hold the
+  // free-tier budget (100k reads / 1k writes a day) in check.
+  async fetch(request, rawEnv) {
+    const n = { r: 0, w: 0 };
+    const KV = rawEnv.KV;
+    const env = { ...rawEnv, KV: {
+      get: (...a) => { n.r++; return KV.get(...a); },
+      put: (...a) => { n.w++; return KV.put(...a); },
+      delete: (...a) => { n.w++; return KV.delete(...a); },
+      list: (...a) => { n.r++; return KV.list(...a); },
+    } };
+    const res = await worker.handle(request, env);
+    try { res.headers.set("x-kv", `r=${n.r} w=${n.w}`); return res; }
+    catch { const r2 = new Response(res.body, res); r2.headers.set("x-kv", `r=${n.r} w=${n.w}`); return r2; }
+  },
+
+  async handle(request, env) {
     const url = new URL(request.url);
     const path = url.pathname;
     const method = request.method;
@@ -208,31 +234,18 @@ export default {
       // ----- auth -----
       if (path.startsWith("/api/auth/")) try {
         const cfg = await loadConfig(env);
-        if (method === "POST" && path === "/api/auth/register/options") {
-          const { player } = await request.json();
-          if (!cfg.players.includes(player)) return bad("Unknown player.");
-          return json(await registerOptions(env, url, player));
-        }
-        if (method === "POST" && path === "/api/auth/register") {
-          const player = await registerFinish(env, url, await request.json());
-          return json({ ok: true, player }, 200, { "set-cookie": await makeSession(env, player) });
-        }
-        if (method === "POST" && path === "/api/auth/login/options") {
+        // Tap your name: the first phone to claim a name owns it.
+        if (method === "POST" && path === "/api/auth/claim") {
           const { player } = await request.json().catch(() => ({}));
-          return json(await loginOptions(env, url, player || null));
-        }
-        if (method === "POST" && path === "/api/auth/login") {
-          const player = await loginFinish(env, url, await request.json());
-          return json({ ok: true, player }, 200, { "set-cookie": await makeSession(env, player) });
-        }
-        if (method === "POST" && (path === "/api/auth/password/register" || path === "/api/auth/password/login")) {
-          const { player, password } = await request.json().catch(() => ({}));
           if (!cfg.players.includes(player)) return bad("Unknown player.");
-          if (path.endsWith("/register")) await passwordRegister(env, player, password);
-          else await passwordLogin(env, player, password);
-          return json({ ok: true, player }, 200, { "set-cookie": await makeSession(env, player) });
+          const cookie = await claimPlayer(env, player);
+          await rebuildClaimIndex(env, cfg.players);
+          return json({ ok: true, player }, 200, { "set-cookie": cookie });
         }
+        // Signing out frees the name, so this phone (or another) can pick again.
         if (method === "POST" && path === "/api/auth/logout") {
+          const me = await readSession(request, env);
+          if (me) { await releasePlayer(env, me); await rebuildClaimIndex(env, cfg.players); }
           return json({ ok: true }, 200, { "set-cookie": clearSession() });
         }
         return bad("Not found", 404);
@@ -320,6 +333,7 @@ export default {
           if (line) {
             bingo = { at: Date.now(), line };
             await env.KV.put(bingoKey(player), JSON.stringify(bingo));
+            await rebuildBingoIndex(env, cfg);
             fresh = true;
           }
         }
@@ -348,7 +362,7 @@ export default {
         const bingo = await env.KV.get(bingoKey(player), "json");
         if (bingo) {
           const boards = await loadBoards(env, cfg);
-          if (!findBingo(boards.boards[player], marks)) await env.KV.delete(bingoKey(player));
+          if (!findBingo(boards.boards[player], marks)) { await env.KV.delete(bingoKey(player)); await rebuildBingoIndex(env, cfg); }
         }
         return json({ ok: true });
       }
@@ -376,6 +390,7 @@ export default {
           const body = await request.json();
           const targets = body.player === "*" ? cfg.players : [body.player];
           for (const p of targets) await releasePlayer(env, p);
+          await rebuildClaimIndex(env, cfg.players);
           return json({ ok: true });
         }
 
@@ -397,6 +412,7 @@ export default {
           if (body.regenerate) next.version = cfg.version + 1;
           await env.KV.put("cfg", JSON.stringify(next));
           if (body.regenerate) await env.KV.put("boards", JSON.stringify(buildBoards(next)));
+          if (Array.isArray(body.players)) { await rebuildClaimIndex(env, next.players); await rebuildBingoIndex(env, next); }
           return json({ ok: true, version: next.version });
         }
 
@@ -415,6 +431,7 @@ export default {
             await env.KV.delete(marksKey(p));
             await env.KV.delete(bingoKey(p));
           }
+          await rebuildBingoIndex(env, cfg);
           return json({ ok: true });
         }
       }
@@ -425,3 +442,4 @@ export default {
     }
   },
 };
+export default worker;
