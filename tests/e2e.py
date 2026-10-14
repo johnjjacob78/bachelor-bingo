@@ -176,7 +176,7 @@ with sync_playwright() as p:
     check("photos: caption has player, clue, witness", "John" in A.locator(".ph").first.inner_text() and "w/ Jay" in A.locator(".ph").first.inner_text())
     first_src = A.evaluate("() => { document.querySelector('.ph').click(); const im = document.querySelector('#light img'); return im && im.getAttribute('src'); }")
     A.wait_for_selector("#light.open")
-    check("photos: lightbox shows the thumbnail instantly", first_src and "-thumb" in first_src, str(first_src))
+    check("photos: lightbox shows the thumbnail instantly", first_src and "-thumb" in first_src, f"{first_src} | wall: {[(i['clue'][:20], bool(i.get('thumb'))) for i in anon('/api/photos')[1]['items']]} | first .ph img: {A.get_attribute('.ph img', 'src')}")
     A.wait_for_function("document.querySelector('#light img') && !document.querySelector('#light img').src.includes('-thumb')", timeout=20000)
     check("photos: lightbox swaps in the full-size photo", A.evaluate("document.querySelector('#light img').naturalWidth") >= 1200)
     A.click("#light"); A.wait_for_function("!document.querySelector('#light').classList.contains('open')")
