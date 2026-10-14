@@ -9,9 +9,17 @@ Cloudflare Worker. Everyone opens one link and taps their name; that phone then 
 
 ## Deploy
 
+Deploys are automatic: Cloudflare Workers Builds is connected to this repo and runs
+`npx wrangler deploy` on every push to `main` (about a minute). Open a PR, merge it, done.
+Build logs: Cloudflare dashboard → Workers & Pages → bachelor-bingo → Deployments.
+
+Preview builds are **off** on purpose: previews would share the live KV and R2, so a
+work-in-progress branch could change real boards and photos.
+
+Manual deploy, if ever needed:
+
 ```bash
-cd ~/Projects/bachelor-bingo
-npx wrangler@latest deploy      # -> https://bachelor-bingo.jjworker99.workers.dev
+cd ~/Projects/bachelor-bingo && git pull && npx wrangler@latest deploy
 ```
 
 ## Test
