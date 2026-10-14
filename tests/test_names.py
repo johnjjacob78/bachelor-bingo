@@ -157,6 +157,29 @@ def main():
     check("consistency: photo wall shows each mark exactly once", len(photos) == 11, str(len(photos)))
     call("/api/host/reset", {"player": "Kaushik"})
 
+    # boards: balanced, varied, never about yourself
+    def all_boards():
+        c = call("/api/host/config")[1]["cfg"]
+        return c, {p: [x.get("id") for x in call(f"/api/state?player={urllib.request.quote(p)}")[1]["board"]] for p in c["players"]}
+    cfgb, boards = all_boards()
+    about = {c["id"]: c["about"] for c in cfgb["clues"]}
+    P = cfgb["players"]
+    check("boards: every board has 16 different clues", all(len(set(b)) == 16 and None not in b for b in boards.values()))
+    check("boards: nobody gets a clue about themselves", not [(p, i) for p, b in boards.items() for i in b if p in about[i]])
+    uses = {c["id"]: 0 for c in cfgb["clues"]}
+    for b in boards.values():
+        for i in b: uses[i] += 1
+    check("boards: every clue is used about equally (max - min <= 1)", max(uses.values()) - min(uses.values()) <= 1, f"{min(uses.values())}..{max(uses.values())}")
+    ovs = [len(set(boards[P[i]]) & set(boards[P[j]])) for i in range(len(P)) for j in range(i + 1, len(P))]
+    check("boards: no two boards share more than 7 clues", max(ovs) <= 7, f"max {max(ovs)}, avg {sum(ovs)/len(ovs):.2f}")
+    cells = [(i, k) for b in boards.values() for k, i in enumerate(b)]
+    check("boards: a shared clue almost never sits in the same square (<= 2 repeats)", len(cells) - len(set(cells)) <= 2, str(len(cells) - len(set(cells))))
+    call("/api/host/config", {"regenerate": True})
+    cfg2, boards2 = all_boards()
+    check("boards: regenerate picks a new random seed", cfg2.get("seed") and cfg2.get("seed") != cfgb.get("seed"), f"{cfgb.get('seed')} -> {cfg2.get('seed')}")
+    same = sum(1 for p in P if boards2[p] == boards[p])
+    check("boards: regenerate reshuffles every board", same == 0, f"{same} unchanged")
+
     # standings: closeness to bingo beats raw mark count
     kb = [c["id"] for c in call("/api/state?player=Kaushik")[1]["board"]]
     rb = [c["id"] for c in call("/api/state?player=Rahul")[1]["board"]]

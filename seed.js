@@ -73,4 +73,5 @@ export const CLUES = [
   "Kush G makes an age joke",
   "Diante breaks out the baggie",
   "Someone loses their vape",
+  "Phillip takes someone else's shirt off",
 ];

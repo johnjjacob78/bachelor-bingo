@@ -7,7 +7,7 @@ const SIZE = 4;
 const CELLS = SIZE * SIZE;
 // Boards have no free square: all 16 cells are clues. Bump BOARD_FORMAT whenever the layout
 // changes, so boards saved in KV under an older layout are rebuilt instead of reused.
-const BOARD_FORMAT = 2;
+const BOARD_FORMAT = 3;
 const MAX_PHOTO = 25 * 1024 * 1024;
 
 // ---------- helpers ----------
@@ -62,18 +62,92 @@ function usableClues(cfg, player) {
   return cfg.clues.filter((c) => !c.about.includes(player));
 }
 
-function buildBoard(cfg, player) {
-  const rand = rng(hash32(player + "|" + cfg.version));
-  const picks = shuffle(usableClues(cfg, player).map((c) => c.id), rand).slice(0, CELLS);
-  const board = [];
-  for (let i = 0; i < CELLS; i++) board.push(picks[i] ?? null);
-  return board;
+// ---------- board generation ----------
+// All boards are built together so they're as different from each other as possible:
+//  1. Which clues: every clue is used about equally often across boards, and any two boards
+//     share as few clues as possible. Greedy fill (most-restricted players first), then a
+//     hill-climb that swaps clues to lower  sum((uses - mean)^2) + sum(pair overlap^2).
+//  2. Where: a clue that's on several boards lands on a different square on each, as far as possible.
+//  Never puts a clue on the board of someone it's about. Seeded by cfg.seed + cfg.version, so
+//  the result is stable for a given seed, and "regenerate" picks a new random seed.
+const b64seed = () => [...crypto.getRandomValues(new Uint8Array(9))].map((x) => x.toString(36)).join("");
+function boardRand(cfg) { return rng(hash32((cfg.seed || "") + "|" + cfg.version)); }
+
+function pickSets(cfg, rand) {
+  const players = cfg.players;
+  const usable = Object.fromEntries(players.map((p) => [p, usableClues(cfg, p).map((c) => c.id)]));
+  const use = Object.fromEntries(cfg.clues.map((c) => [c.id, 0]));
+  const sets = {};
+  // Most restricted first, so they get first pick of rarely used clues.
+  const order = shuffle(players, rand).sort((a, b) => usable[a].length - usable[b].length);
+  for (const p of order) {
+    const ranked = shuffle(usable[p], rand).map((id) => ({ id, s: use[id] + rand() * 0.9 })).sort((a, b) => a.s - b.s);
+    sets[p] = new Set(ranked.slice(0, CELLS).map((x) => x.id));
+    for (const id of sets[p]) use[id]++;
+  }
+  // Hill-climb: swap one clue on one board for an unused-on-that-board clue when it lowers the cost.
+  const mean = (players.length * CELLS) / Math.max(1, cfg.clues.length);
+  const overlap = (a, b) => { let n = 0; for (const id of sets[a]) if (sets[b].has(id)) n++; return n; };
+  const ov = {};
+  for (let i = 0; i < players.length; i++) for (let j = i + 1; j < players.length; j++) {
+    ov[players[i] + "|" + players[j]] = ov[players[j] + "|" + players[i]] = overlap(players[i], players[j]);
+  }
+  const W = 3; // weight on even usage vs. pairwise overlap
+  for (let it = 0; it < 6000; it++) {
+    const p = players[Math.floor(rand() * players.length)];
+    if (usable[p].length <= CELLS) continue;
+    const inSet = [...sets[p]], outSet = usable[p].filter((id) => !sets[p].has(id));
+    const a = inSet[Math.floor(rand() * inSet.length)], b = outSet[Math.floor(rand() * outSet.length)];
+    let delta = W * ((use[a] - 1 - mean) ** 2 - (use[a] - mean) ** 2 + (use[b] + 1 - mean) ** 2 - (use[b] - mean) ** 2);
+    const changes = [];
+    for (const q of players) {
+      if (q === p) continue;
+      const d = (sets[q].has(b) ? 1 : 0) - (sets[q].has(a) ? 1 : 0);
+      if (!d) continue;
+      const o = ov[p + "|" + q];
+      delta += (o + d) ** 2 - o ** 2;
+      changes.push([q, o + d]);
+    }
+    if (delta < 0 || (delta === 0 && rand() < 0.3)) {
+      sets[p].delete(a); sets[p].add(b); use[a]--; use[b]++;
+      for (const [q, o] of changes) ov[p + "|" + q] = ov[q + "|" + p] = o;
+    }
+  }
+  return sets;
+}
+
+function placeOnBoards(cfg, sets, rand, existing = {}) {
+  const at = {}; // clue id -> how many boards already have it in each cell
+  for (const b of Object.values(existing)) b.forEach((id, i) => { if (id) (at[id] ||= {})[i] = (at[id][i] || 0) + 1; });
+  const boards = {};
+  for (const p of shuffle(Object.keys(sets), rand)) {
+    const ids = [...sets[p]];
+    let best = null, bestCost = Infinity;
+    for (let t = 0; t < 120 && bestCost > 0; t++) {
+      const b = shuffle(ids, rand);
+      const cost = b.reduce((s, id, i) => s + (at[id]?.[i] || 0), 0);
+      if (cost < bestCost) { best = b; bestCost = cost; }
+    }
+    best.forEach((id, i) => { (at[id] ||= {})[i] = (at[id][i] || 0) + 1; });
+    boards[p] = [...Array(CELLS)].map((_, i) => best[i] ?? null);
+  }
+  return boards;
 }
 
 function buildBoards(cfg) {
-  const boards = {};
-  for (const p of cfg.players) boards[p] = buildBoard(cfg, p);
+  const rand = boardRand(cfg);
+  const boards = placeOnBoards(cfg, pickSets(cfg, rand), rand);
   return { version: cfg.version, format: BOARD_FORMAT, boards };
+}
+
+// A player added later (without regenerating) gets the least-used clues they're allowed,
+// placed away from where those clues already sit on other boards.
+function buildBoard(cfg, player, existing = {}) {
+  const rand = rng(hash32((cfg.seed || "") + "|" + cfg.version + "|" + player));
+  const use = {};
+  for (const b of Object.values(existing)) for (const id of b) if (id) use[id] = (use[id] || 0) + 1;
+  const ranked = shuffle(usableClues(cfg, player).map((c) => c.id), rand).map((id) => ({ id, s: (use[id] || 0) + rand() * 0.9 })).sort((a, b) => a.s - b.s);
+  return placeOnBoards(cfg, { [player]: new Set(ranked.slice(0, CELLS).map((x) => x.id)) }, rand, existing)[player];
 }
 
 const LINES = (() => {
@@ -106,6 +180,7 @@ async function loadConfig(env) {
       nextId: CLUES.length + 1,
       locked: false,
       version: 1,
+      seed: b64seed(),
       title: "Phillip's Bachelor Party Bingo",
     };
     await env.KV.put("cfg", JSON.stringify(cfg));
@@ -121,7 +196,7 @@ async function loadBoards(env, cfg) {
   }
   // Players added without a version bump still need a board.
   let dirty = false;
-  for (const p of cfg.players) if (!b.boards[p]) { b.boards[p] = buildBoard(cfg, p); dirty = true; }
+  for (const p of cfg.players) if (!b.boards[p]) { b.boards[p] = buildBoard(cfg, p, b.boards); dirty = true; }
   if (dirty) await env.KV.put("boards", JSON.stringify(b));
   return b;
 }
@@ -441,7 +516,8 @@ const worker = {
           }
           if (typeof body.locked === "boolean") next.locked = body.locked;
           if (typeof body.title === "string" && body.title.trim()) next.title = body.title.trim();
-          if (body.regenerate) next.version = cfg.version + 1;
+          // Regenerating picks a brand-new random seed, so boards are reshuffled from scratch.
+          if (body.regenerate) { next.version = cfg.version + 1; next.seed = b64seed(); }
           await env.KV.put("cfg", JSON.stringify(next));
           if (body.regenerate) await env.KV.put("boards", JSON.stringify(buildBoards(next)));
           if (Array.isArray(body.players)) { await rebuildClaimIndex(env, next.players); await rebuildBingoIndex(env, next); }
