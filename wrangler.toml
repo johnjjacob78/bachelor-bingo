@@ -16,3 +16,13 @@ id = "7be229e081b14c0fb36f7cb72926294c"
 [[r2_buckets]]
 binding = "PHOTOS"
 bucket_name = "bachelor-bingo-photos"
+
+# All game state lives in one Durable Object (strongly consistent). KV above is no longer used
+# for game state; the binding stays so the old data isn't orphaned.
+[[durable_objects.bindings]]
+name = "GAME"
+class_name = "Game"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Game"]

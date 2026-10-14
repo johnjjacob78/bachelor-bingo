@@ -8,6 +8,14 @@ from playwright.sync_api import sync_playwright
 
 import os
 B = os.environ.get("BINGO_URL", "http://localhost:8787"); PIN = os.environ.get("HOST_PIN", "ribeye")
+
+# --- network setup: lets the suites run against the live site too ---
+import urllib.request as _ur
+_op = _ur.build_opener(); _op.addheaders = [("User-Agent", "Mozilla/5.0 (bingo-tests)")]  # Cloudflare blocks Python's default UA
+_ur.install_opener(_op)
+_PROXY = os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy")
+LAUNCH_KW = {"proxy": {"server": _PROXY}} if _PROXY and not B.startswith("http://localhost") else {}
+CTX_KW = {"ignore_https_errors": True} if LAUNCH_KW else {}
 SHOTS = os.environ.get("SHOTS", "/tmp")
 results = []
 def check(name, cond, detail=""):
@@ -35,9 +43,9 @@ def claim(pg, name):
 host("/api/host/reset", {"player": "*"}); host("/api/host/release", {"player": "*"}); host("/api/host/config", {"locked": False})
 
 with sync_playwright() as p:
-    br = p.chromium.launch()
+    br = p.chromium.launch(**LAUNCH_KW)
     def phone(width=390):
-        ctx = br.new_context(viewport={"width": width, "height": 844}, device_scale_factor=2)
+        ctx = br.new_context(viewport={"width": width, "height": 844}, device_scale_factor=2, **CTX_KW)
         pg = ctx.new_page(); errs = []; pg.on("pageerror", lambda e: errs.append(str(e)))
         pg.on("dialog", lambda d: d.accept())
         return ctx, pg, errs
@@ -235,17 +243,18 @@ with sync_playwright() as p:
     A.fill("#players", "\n".join(cfg["cfg"]["players"] + ["Zed"])); A.click("#save"); A.wait_for_function("document.querySelector('#players').value.includes('Zed')")
     check("host: add player", "Zed" in host("/api/state")[1]["players"])
     # clue add + autotag
+    n0 = len(host("/api/host/config")[1]["cfg"]["clues"])
     A.click("#addclue"); A.locator("#clues .clue-row textarea").last.fill("Zed and Jay arm wrestle"); A.locator("#clues .clue-row textarea").last.blur(); A.wait_for_timeout(800)
     tagged = A.locator("#clues .clue-row").last.locator(".chip.on").all_inner_texts()
     check("host: new clue auto-tagged", set(tagged) == {"Zed", "Jay"}, str(tagged))
-    A.fill("#bulk", "Bulk one\nBulk two about Rahul"); A.click("#bulkadd"); A.wait_for_function("document.querySelectorAll('#clues .clue-row').length >= 50")
+    A.fill("#bulk", "Bulk one\nBulk two about Rahul"); A.click("#bulkadd"); A.wait_for_function(f"document.querySelectorAll('#clues .clue-row').length >= {n0 + 3}")
     check("host: bulk add tags Rahul", "Rahul" in A.locator("#clues .clue-row").last.locator(".chip.on").all_inner_texts())
     A.click("#save"); A.wait_for_timeout(1200)
     s, c2 = host("/api/host/config")
-    check("host: save persisted clues", c2["cfg"]["clues"][-1]["text"] == "Bulk two about Rahul" and len(c2["cfg"]["clues"]) == 50)
+    check("host: save persisted clues", c2["cfg"]["clues"][-1]["text"] == "Bulk two about Rahul" and len(c2["cfg"]["clues"]) == n0 + 3, f'{len(c2["cfg"]["clues"])} vs {n0 + 3}')
     # delete clue via ✕ then save
     A.locator("#clues .clue-row [data-rm]").last.click(); A.click("#save"); A.wait_for_timeout(1200)
-    check("host: delete clue", len(host("/api/host/config")[1]["cfg"]["clues"]) == 49)
+    check("host: delete clue", len(host("/api/host/config")[1]["cfg"]["clues"]) == n0 + 2)
     # regenerate
     jb = host("/api/state?player=Kaushik")[1]["board"]
     A.click("#regen"); A.wait_for_timeout(1500)
