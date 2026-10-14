@@ -1,0 +1,573 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d0b14">
+<title>Bachelor Bingo</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23f5c242'/%3E%3Ctext x='32' y='44' font-size='34' text-anchor='middle' font-family='Arial' font-weight='900'%3EB%3C/text%3E%3C/svg%3E">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0b14; --panel: #171426; --panel2: #1f1b33; --line: #2c2746;
+    --text: #f4f1ff; --muted: #a39fbd; --gold: #f5c242; --gold-ink: #2a1d00;
+    --green: #34d399; --red: #fb7185; --blue: #60a5fa;
+    --cell: #1b1830; --cell-marked: #2a6f4a;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font-family: Inter, system-ui, sans-serif; }
+  body { min-height: 100dvh; padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
+  h1, h2, h3 { font-family: "Bricolage Grotesque", Inter, sans-serif; letter-spacing: -0.02em; margin: 0; }
+  button { font: inherit; cursor: pointer; border: 0; }
+  .wrap { max-width: 560px; margin: 0 auto; padding: 16px; }
+  header.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+  header.top h1 { font-size: 22px; font-weight: 800; }
+  header.top .who { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+  header.top .who { flex-shrink: 0; }
+  header.top .who button { background: var(--panel2); color: var(--text); padding: 7px 10px; border-radius: 999px; font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .pill { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--panel2); color: var(--muted); }
+  .pill.gold { background: var(--gold); color: var(--gold-ink); }
+  .pill.red { background: #3d1a26; color: var(--red); }
+
+  /* board */
+  .status { display: flex; justify-content: space-between; align-items: center; margin: 6px 0 12px; font-size: 13px; color: var(--muted); }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
+  .cell { position: relative; aspect-ratio: 1; border-radius: 14px; background: var(--cell); border: 1px solid var(--line);
+          padding: 8px 7px; display: flex; align-items: center; justify-content: center; text-align: center;
+          font-size: 11.5px; line-height: 1.2; font-weight: 500; overflow: hidden; transition: transform .08s; }
+  .cell:active { transform: scale(.96); }
+  .cell.free { background: var(--gold); color: var(--gold-ink); font-family: "Bricolage Grotesque", sans-serif; font-weight: 800; font-size: 18px; }
+  .cell.blank { color: var(--muted); font-style: italic; }
+  .cell.marked { background: var(--cell-marked); border-color: #3fa36c; color: #fff; }
+  .cell.marked img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .45; }
+  .cell.marked span { position: relative; z-index: 1; text-shadow: 0 1px 3px rgba(0,0,0,.8); }
+  .cell.marked::after { content: "✓"; position: absolute; top: 5px; right: 7px; z-index: 1; font-weight: 800; color: var(--green); font-size: 14px; text-shadow: 0 1px 3px rgba(0,0,0,.8); }
+  .cell.inline { outline: 3px solid var(--gold); outline-offset: -3px; }
+  @media (min-width: 420px) { .cell { font-size: 13px; } }
+
+  .banner { background: linear-gradient(135deg, #f5c242, #ff8a5c); color: #2a1d00; border-radius: 16px; padding: 14px 16px; margin-bottom: 14px; }
+  .banner h2 { font-size: 20px; }
+  .banner p { margin: 4px 0 0; font-size: 13px; font-weight: 500; }
+  .note { color: var(--muted); font-size: 13px; line-height: 1.5; margin: 12px 0 0; }
+
+  /* nav */
+  nav.tabs { position: fixed; left: 0; right: 0; bottom: 0; background: rgba(13,11,20,.92); backdrop-filter: blur(12px); border-top: 1px solid var(--line);
+             display: flex; padding: 8px 8px calc(8px + env(safe-area-inset-bottom)); z-index: 20; }
+  nav.tabs button { flex: 1; background: transparent; color: var(--muted); padding: 8px 4px; border-radius: 12px; font-size: 11px; font-weight: 600; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  nav.tabs button .ico { font-size: 20px; line-height: 1; }
+  nav.tabs button.active { color: var(--gold); background: var(--panel); }
+  .view { display: none; } .view.active { display: block; }
+
+  /* sheet */
+  .scrim { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 30; display: none; }
+  .scrim.open { display: block; }
+  .sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 31; background: var(--panel); border-radius: 22px 22px 0 0; padding: 18px 18px calc(18px + env(safe-area-inset-bottom));
+           transform: translateY(105%); transition: transform .22s ease; max-height: 92dvh; overflow: auto; }
+  .sheet.open { transform: none; }
+  .sheet h3 { font-size: 20px; margin-bottom: 4px; }
+  .sheet .clue { color: var(--muted); font-size: 14px; margin-bottom: 14px; }
+  label.field { display: block; font-size: 12px; color: var(--muted); font-weight: 600; margin: 12px 0 6px; text-transform: uppercase; letter-spacing: .04em; }
+  select, input[type=text], input[type=password], textarea { width: 100%; background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 12px; padding: 12px; font: inherit; font-size: 16px; }
+  .btn { width: 100%; padding: 14px; border-radius: 14px; font-weight: 700; font-size: 16px; background: var(--gold); color: var(--gold-ink); margin-top: 10px; }
+  .btn.ghost { background: var(--panel2); color: var(--text); }
+  .btn.danger { background: #3d1a26; color: var(--red); }
+  .btn:disabled { opacity: .5; }
+  .btn.sm { width: auto; padding: 8px 12px; font-size: 13px; margin: 0; border-radius: 10px; }
+  .preview { width: 100%; aspect-ratio: 4/3; border-radius: 14px; object-fit: cover; background: var(--panel2); display: block; margin-top: 6px; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.4; }
+  .err { color: var(--red); font-size: 13px; margin-top: 8px; min-height: 1em; }
+
+  /* lists */
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 14px; margin-bottom: 10px; }
+  .row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .row:last-child { border-bottom: 0; }
+  .row .rank { width: 26px; font-family: "Bricolage Grotesque", sans-serif; font-weight: 800; color: var(--muted); }
+  .row .name { flex: 1; font-weight: 600; }
+  .row .meta { font-size: 12px; color: var(--muted); }
+  .bar { height: 6px; background: var(--panel2); border-radius: 99px; overflow: hidden; margin-top: 6px; }
+  .bar i { display: block; height: 100%; background: var(--green); }
+  .photos { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .ph { background: var(--panel); border-radius: 14px; overflow: hidden; border: 1px solid var(--line); }
+  .ph img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; }
+  .ph .cap { padding: 8px 10px; font-size: 12px; line-height: 1.35; }
+  .ph .cap b { display: block; font-size: 13px; }
+  .ph .cap span { color: var(--muted); }
+  .light { position: fixed; inset: 0; background: rgba(0,0,0,.92); z-index: 40; display: none; align-items: center; justify-content: center; padding: 16px; flex-direction: column; gap: 10px; }
+  .light.open { display: flex; }
+  .light img { max-width: 100%; max-height: 80dvh; border-radius: 12px; }
+  .light p { color: var(--muted); font-size: 13px; text-align: center; margin: 0; }
+
+  /* picker */
+  .names { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 12px; }
+  .names button { background: var(--panel2); color: var(--text); padding: 14px; border-radius: 12px; font-weight: 600; font-size: 15px; }
+  .names button.taken { color: var(--muted); }
+  .names button.taken::after { content: " 🔒"; }
+  .names button.taken.pw::after { content: " 🔑"; }
+
+  /* host */
+  .clue-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: start; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .clue-row textarea { min-height: 44px; font-size: 14px; padding: 8px 10px; resize: vertical; }
+  .clue-row .about { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 5px; }
+  .chip { font-size: 11px; padding: 3px 8px; border-radius: 999px; background: var(--panel2); color: var(--muted); border: 1px solid var(--line); }
+  .chip.on { background: #3d1a26; color: var(--red); border-color: #5b2838; }
+  .x { background: transparent; color: var(--muted); font-size: 18px; padding: 6px; }
+  .switch { display: flex; align-items: center; justify-content: space-between; }
+  .warn { color: var(--red); }
+  canvas#confetti { position: fixed; inset: 0; pointer-events: none; z-index: 50; }
+</style>
+</head>
+<body>
+<canvas id="confetti"></canvas>
+
+<div class="wrap">
+  <header class="top">
+    <h1 id="title">Bachelor Bingo</h1>
+    <div class="who" id="who"></div>
+  </header>
+
+  <!-- pick name -->
+  <section class="view" id="view-pick">
+    <div class="card" id="returning" style="display:none">
+      <button class="btn" id="signin" style="margin:0">🔒 Sign in with Face ID</button>
+      <p class="hint" style="text-align:center">Already set up on this phone? Tap that.</p>
+    </div>
+    <div class="card">
+      <h2 style="font-size:22px">Who are you?</h2>
+      <p class="note" style="margin-top:4px">Pick your name, then lock your board with Face ID or a password so nobody else can mark your squares. Names with a lock are already taken.</p>
+      <div class="names" id="names"></div>
+      <div class="err" id="pick-err"></div>
+      <p class="hint" id="nowebauthn" style="display:none">This browser can't do Face ID, so you'll be offered a password instead.</p>
+    </div>
+  </section>
+
+  <!-- board -->
+  <section class="view" id="view-board">
+    <div id="banner"></div>
+    <div class="status"><span id="progress"></span><span id="lockpill"></span></div>
+    <div class="grid" id="grid"></div>
+    <p class="note">Tap a square when it happens. You need a photo with a witness, so grab someone and snap it. First bingo wins. Rows, columns, and diagonals count.</p>
+  </section>
+
+  <!-- standings -->
+  <section class="view" id="view-standings">
+    <div class="card" id="standings"></div>
+  </section>
+
+  <!-- photos -->
+  <section class="view" id="view-photos">
+    <div class="photos" id="photos"></div>
+    <p class="note" id="photos-empty" style="display:none">No photos yet. Somebody do something.</p>
+  </section>
+
+  <!-- host -->
+  <section class="view" id="view-host">
+    <div class="card" id="host-login">
+      <h2 style="font-size:20px">Host</h2>
+      <label class="field">PIN</label>
+      <input type="password" id="pin" placeholder="PIN" autocomplete="off">
+      <button class="btn" id="pin-go">Open host controls</button>
+      <div class="err" id="pin-err"></div>
+    </div>
+    <div id="host" style="display:none"></div>
+  </section>
+</div>
+
+<nav class="tabs">
+  <button data-view="board"><span class="ico">🎯</span>Board</button>
+  <button data-view="standings"><span class="ico">🏆</span>Standings</button>
+  <button data-view="photos"><span class="ico">📸</span>Photos</button>
+  <button data-view="host"><span class="ico">🔧</span>Host</button>
+</nav>
+
+<div class="scrim" id="scrim"></div>
+<div class="sheet" id="sheet"></div>
+<div class="light" id="light"></div>
+
+<script>
+(() => {
+  const $ = (s, el = document) => el.querySelector(s);
+  const h = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const fmt = (t) => new Date(t).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" });
+
+  const state = { player: "", viewAs: "", data: null, view: "board", pin: sessionStorage.getItem("bingo:pin") || "", bingoSeen: localStorage.getItem("bingo:seen") || "" };
+
+  // ---- passkeys ----
+  const b64u = {
+    enc: (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""),
+    dec: (s) => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - s.length % 4) % 4)), (c) => c.charCodeAt(0)),
+  };
+  const hasPasskeys = () => !!(window.PublicKeyCredential && navigator.credentials);
+  async function registerPasskey(player) {
+    const o = await api("/api/auth/register/options", { method: "POST", body: JSON.stringify({ player }) });
+    const pk = o.publicKey;
+    pk.challenge = b64u.dec(pk.challenge); pk.user.id = b64u.dec(pk.user.id);
+    const cred = await navigator.credentials.create({ publicKey: pk });
+    return api("/api/auth/register", { method: "POST", body: JSON.stringify({
+      challengeId: o.challengeId, id: cred.id,
+      response: { clientDataJSON: b64u.enc(cred.response.clientDataJSON), attestationObject: b64u.enc(cred.response.attestationObject) },
+    }) });
+  }
+  async function loginPasskey(player) {
+    const o = await api("/api/auth/login/options", { method: "POST", body: JSON.stringify({ player: player || null }) });
+    const pk = o.publicKey;
+    pk.challenge = b64u.dec(pk.challenge);
+    pk.allowCredentials = (pk.allowCredentials || []).map((c) => ({ ...c, id: b64u.dec(c.id) }));
+    const cred = await navigator.credentials.get({ publicKey: pk });
+    return api("/api/auth/login", { method: "POST", body: JSON.stringify({
+      challengeId: o.challengeId, id: cred.id,
+      response: { clientDataJSON: b64u.enc(cred.response.clientDataJSON), authenticatorData: b64u.enc(cred.response.authenticatorData), signature: b64u.enc(cred.response.signature) },
+    }) });
+  }
+  const friendly = (e) => /NotAllowed|abort|cancel/i.test(e.name + e.message) ? "Face ID was cancelled. Try again." : e.message;
+
+  // ---- fetch helpers ----
+  async function api(path, opts = {}) {
+    const r = await fetch(path, { ...opts, headers: { ...(opts.headers || {}), ...(state.pin ? { "x-pin": state.pin } : {}) } });
+    const d = await r.json().catch(() => ({ error: "Bad response" }));
+    if (!r.ok) throw new Error(d.error || ("HTTP " + r.status));
+    return d;
+  }
+
+  // ---- views ----
+  function show(view) {
+    state.view = view;
+    document.querySelectorAll(".view").forEach((v) => v.classList.toggle("active", v.id === "view-" + view));
+    document.querySelectorAll("nav.tabs button").forEach((b) => b.classList.toggle("active", b.dataset.view === view));
+    if (view === "standings") loadStandings();
+    if (view === "photos") loadPhotos();
+    if (view === "host" && state.pin) loadHost();
+  }
+  document.querySelectorAll("nav.tabs button").forEach((b) => b.addEventListener("click", () => {
+    if (b.dataset.view === "board" && !state.player) return show("pick");
+    show(b.dataset.view);
+  }));
+
+  // ---- board ----
+  async function loadBoard() {
+    const q = state.viewAs && state.pin ? "?player=" + encodeURIComponent(state.viewAs) : "";
+    const d = await api("/api/state" + q);
+    state.data = d;
+    state.player = d.player || "";
+    $("#title").textContent = d.title || "Bachelor Bingo";
+    const viewing = state.viewAs && state.player === state.viewAs && state.viewAs !== d.me;
+    $("#who").innerHTML = state.player
+      ? `<span>${viewing ? "viewing " : ""}${h(state.player)}</span><button id="switch">${viewing ? "Done" : "Sign out"}</button>`
+      : "";
+    const sw = $("#switch"); if (sw) sw.onclick = async () => {
+      if (viewing) { state.viewAs = ""; await loadBoard(); show(d.me ? "board" : "host"); return; }
+      await api("/api/auth/logout", { method: "POST" }); state.player = ""; await loadBoard(); show("pick");
+    };
+    // picker
+    const ok = hasPasskeys();
+    $("#nowebauthn").style.display = ok ? "none" : "block";
+    $("#returning").style.display = ok && Object.values(d.claimed).some((v) => v === "passkey" || v === "both") ? "block" : "none";
+    $("#names").innerHTML = d.players.map((p) => `<button data-p="${h(p)}" class="${d.claimed[p] ? "taken" : ""} ${d.claimed[p] === "password" ? "pw" : ""}">${h(p)}</button>`).join("");
+    document.querySelectorAll("#names button").forEach((b) => b.onclick = () => { $("#pick-err").textContent = ""; lockSheet(b.dataset.p, d.claimed[b.dataset.p]); });
+    $("#signin").onclick = async () => {
+      $("#pick-err").textContent = "";
+      try { await loginPasskey(null); await loadBoard(); show("board"); } catch (e) { $("#pick-err").textContent = friendly(e); }
+    };
+    if (!state.player) { if (state.view === "board") show("pick"); return; }
+    renderBoard(d);
+  }
+
+  function renderBoard(d) {
+    const line = new Set(d.bingo?.line || d.line || []);
+    $("#grid").innerHTML = d.board.map((c) => {
+      if (c.free) return `<div class="cell free${line.has(c.cell) ? " inline" : ""}">FREE</div>`;
+      if (c.blank) return `<div class="cell blank">no clue left for you</div>`;
+      const marked = !!c.mark;
+      return `<div class="cell${marked ? " marked" : ""}${line.has(c.cell) ? " inline" : ""}" data-id="${h(c.id)}">${marked ? `<img src="/photo/${encodeURIComponent(c.mark.thumb || c.mark.key)}" alt="" loading="lazy">` : ""}<span>${h(c.text)}</span></div>`;
+    }).join("");
+    document.querySelectorAll("#grid .cell[data-id]").forEach((el) => el.onclick = () => openCell(el.dataset.id));
+    const marked = d.board.filter((c) => c.mark).length;
+    $("#progress").textContent = `${marked} of 15 marked · ${d.clueCount} clues in play`;
+    $("#lockpill").innerHTML = d.locked ? `<span class="pill red">Locked</span>` : "";
+    const firsts = Object.entries(d.bingos).sort((a, b) => a[1].at - b[1].at);
+    let banner = "";
+    if (d.bingo) banner = `<div class="banner"><h2>BINGO! 🎉</h2><p>You got it at ${fmt(d.bingo.at)}${firsts[0]?.[0] === state.player ? " — and you were first." : ` — ${h(firsts[0][0])} beat you to it.`}</p></div>`;
+    else if (firsts.length) banner = `<div class="banner"><h2>${h(firsts[0][0])} has bingo</h2><p>${fmt(firsts[0][1].at)}. Keep going for the photos.</p></div>`;
+    $("#banner").innerHTML = banner;
+    if (d.bingo && state.bingoSeen !== String(d.bingo.at)) { state.bingoSeen = String(d.bingo.at); localStorage.setItem("bingo:seen", state.bingoSeen); confetti(); }
+  }
+
+  // ---- claim / sign-in sheet ----
+  function lockSheet(p, how) {
+    const pk = hasPasskeys();
+    const done = async () => { closeSheet(); await loadBoard(); show("board"); };
+    const fail = (e) => { $("#lerr").textContent = friendly(e); document.querySelectorAll("#sheet button").forEach((b) => b.disabled = false); };
+    const busy = () => document.querySelectorAll("#sheet button").forEach((b) => b.disabled = true);
+    if (!how) {
+      sheet(`
+        <h3>Lock your board, ${h(p)}</h3>
+        <div class="clue">Pick one. This is how you'll get back in all weekend.</div>
+        ${pk ? `<button class="btn" id="l-face">🔒 Use Face ID</button>` : ""}
+        <button class="btn ghost" id="l-pw-start">🔑 Use a password</button>
+        <div id="l-pw" style="display:none">
+          <label class="field">Choose a password</label>
+          <input type="password" id="l-pass" autocomplete="new-password" placeholder="At least 4 characters">
+          <label class="field">Type it again</label>
+          <input type="password" id="l-pass2" autocomplete="new-password">
+          <button class="btn" id="l-pw-go">Lock it</button>
+        </div>
+        <div class="err" id="lerr"></div>`);
+      const f = $("#l-face"); if (f) f.onclick = async () => { busy(); try { await registerPasskey(p); await done(); } catch (e) { fail(e); } };
+      $("#l-pw-start").onclick = () => { $("#l-pw").style.display = "block"; $("#l-pw-start").style.display = "none"; $("#l-pass").focus(); };
+      $("#l-pw-go").onclick = async () => {
+        const a = $("#l-pass").value, b = $("#l-pass2").value;
+        if (a.length < 4) return $("#lerr").textContent = "At least 4 characters.";
+        if (a !== b) return $("#lerr").textContent = "Those don't match.";
+        busy(); try { await api("/api/auth/password/register", { method: "POST", body: JSON.stringify({ player: p, password: a }) }); await done(); } catch (e) { fail(e); }
+      };
+      return;
+    }
+    const usesPk = how === "passkey" || how === "both", usesPw = how === "password" || how === "both";
+    sheet(`
+      <h3>Welcome back, ${h(p)}</h3>
+      <div class="clue">${usesPk && usesPw ? "Face ID or your password." : usesPk ? "This name is locked with Face ID." : "This name is locked with a password."}</div>
+      ${usesPk && pk ? `<button class="btn" id="l-face">🔒 Sign in with Face ID</button>` : ""}
+      ${usesPk && !pk ? `<p class="hint">This browser can't do Face ID. Use the phone you set it up on, or ask the host to release your name.</p>` : ""}
+      ${usesPw ? `<label class="field">Password</label><input type="password" id="l-pass" autocomplete="current-password"><button class="btn ${usesPk ? "ghost" : ""}" id="l-pw-go">Sign in</button>` : ""}
+      <p class="hint">Not you? Pick your own name instead.</p>
+      <div class="err" id="lerr"></div>`);
+    const f = $("#l-face"); if (f) f.onclick = async () => { busy(); try { await loginPasskey(p); await done(); } catch (e) { fail(e); } };
+    const g = $("#l-pw-go"); if (g) {
+      g.onclick = async () => { busy(); try { await api("/api/auth/password/login", { method: "POST", body: JSON.stringify({ player: p, password: $("#l-pass").value }) }); await done(); } catch (e) { fail(e); } };
+      $("#l-pass").onkeydown = (e) => { if (e.key === "Enter") g.click(); };
+    }
+  }
+
+  // ---- cell sheet ----
+  let pendingBlob = null;
+  function openCell(id) {
+    const c = state.data.board.find((x) => x.id === id);
+    if (!c) return;
+    pendingBlob = null;
+    const others = state.data.players.filter((p) => p !== state.player);
+    if (c.mark) {
+      const canUndo = Date.now() - c.mark.at < 10 * 60 * 1000;
+      sheet(`
+        <h3>Marked ✓</h3>
+        <div class="clue">${h(c.text)}</div>
+        <img class="preview" src="/photo/${encodeURIComponent(c.mark.thumb || c.mark.key)}" alt="">
+        <p class="hint">Witness: <b>${h(c.mark.witness)}</b> · ${fmt(c.mark.at)}</p>
+        ${canUndo ? `<button class="btn danger" id="undo">Undo this mark</button>` : `<p class="hint">Marks lock after 10 minutes. Ask the host if it needs to go.</p>`}
+        <button class="btn ghost" id="close">Close</button>
+        <div class="err" id="serr"></div>`);
+      $("#close").onclick = closeSheet;
+      const u = $("#undo"); if (u) u.onclick = async () => {
+        u.disabled = true;
+        try { await api(`/api/mark?clue=${encodeURIComponent(id)}${state.viewAs ? "&player=" + encodeURIComponent(state.viewAs) : ""}`, { method: "DELETE" }); closeSheet(); loadBoard(); }
+        catch (e) { $("#serr").textContent = e.message; u.disabled = false; }
+      };
+      return;
+    }
+    if (state.data.locked) { sheet(`<h3>Locked</h3><div class="clue">The host has locked the game. Hold your horses.</div><button class="btn ghost" id="close">Close</button>`); $("#close").onclick = closeSheet; return; }
+    sheet(`
+      <h3>It happened?</h3>
+      <div class="clue">${h(c.text)}</div>
+      <label class="field">Who saw it (they're in the photo)</label>
+      <select id="witness"><option value="">Pick a witness</option>${others.map((p) => `<option>${h(p)}</option>`).join("")}</select>
+      <label class="field">Proof</label>
+      <input type="file" id="file" accept="image/*" capture="environment" style="display:none">
+      <button class="btn ghost" id="snap">📸 Take a photo with your witness</button>
+      <img class="preview" id="prev" alt="" style="display:none">
+      <p class="hint">The photo goes on the wall for everyone. Faces in frame, please.</p>
+      <button class="btn" id="mark" disabled>Mark it</button>
+      <div class="err" id="serr"></div>`);
+    const file = $("#file"), prev = $("#prev"), mark = $("#mark"), w = $("#witness");
+    const ready = () => { mark.disabled = !(pendingBlob && w.value); };
+    w.onchange = ready;
+    $("#snap").onclick = () => file.click();
+    file.onchange = async () => {
+      const f = file.files[0]; if (!f) return;
+      $("#serr").textContent = "";
+      try { pendingBlob = await shrink(f); prev.src = URL.createObjectURL(pendingBlob.thumb); prev.style.display = "block"; $("#snap").textContent = "📸 Retake"; }
+      catch (e) { $("#serr").textContent = "Couldn't read that photo. Try again."; }
+      ready();
+    };
+    mark.onclick = async () => {
+      mark.disabled = true; mark.textContent = "Uploading…";
+      const fd = new FormData();
+      if (state.viewAs) fd.append("player", state.viewAs);
+      fd.append("clue", id); fd.append("witness", w.value);
+      fd.append("photo", pendingBlob.full, "proof.jpg"); fd.append("thumb", pendingBlob.thumb, "thumb.jpg");
+      try {
+        const r = await api("/api/mark", { method: "POST", body: fd });
+        closeSheet();
+        await loadBoard();
+        if (r.newBingo) confetti();
+      } catch (e) { $("#serr").textContent = e.message; mark.disabled = false; mark.textContent = "Mark it"; }
+    };
+  }
+
+  // Full-resolution original (re-encoded only to fix orientation / HEIC), plus a small thumbnail for the grid.
+  async function shrink(file) {
+    const bmp = await createImageBitmap(file, { imageOrientation: "from-image" }).catch(() => null);
+    if (!bmp) return { full: file, thumb: file };
+    const draw = (max, q) => {
+      const s = Math.min(1, max / Math.max(bmp.width, bmp.height));
+      const cv = document.createElement("canvas");
+      cv.width = Math.round(bmp.width * s); cv.height = Math.round(bmp.height * s);
+      cv.getContext("2d").drawImage(bmp, 0, 0, cv.width, cv.height);
+      return new Promise((res) => cv.toBlob((b) => res(b || file), "image/jpeg", q));
+    };
+    const full = /^image\/(jpeg|png|webp)$/.test(file.type) && file.size < 20e6 ? file : await draw(4096, 0.95);
+    return { full, thumb: await draw(640, 0.8) };
+  }
+
+  function sheet(html) { $("#sheet").innerHTML = html; $("#sheet").classList.add("open"); $("#scrim").classList.add("open"); }
+  function closeSheet() { $("#sheet").classList.remove("open"); $("#scrim").classList.remove("open"); }
+  $("#scrim").onclick = closeSheet;
+
+  // ---- standings ----
+  async function loadStandings() {
+    const d = await api("/api/leaderboard");
+    $("#standings").innerHTML = `<h2 style="font-size:20px;margin-bottom:6px">Standings</h2>` + d.rows.map((r, i) => `
+      <div class="row">
+        <div class="rank">${i + 1}</div>
+        <div style="flex:1">
+          <div class="name">${h(r.player)} ${r.bingoAt ? `<span class="pill gold">BINGO ${fmt(r.bingoAt)}</span>` : ""}</div>
+          <div class="bar"><i style="width:${Math.round(r.marked / 15 * 100)}%"></i></div>
+        </div>
+        <div class="meta">${r.marked}/15</div>
+      </div>`).join("");
+  }
+
+  // ---- photos ----
+  async function loadPhotos() {
+    const d = await api("/api/photos");
+    $("#photos-empty").style.display = d.items.length ? "none" : "block";
+    $("#photos").innerHTML = d.items.map((p, i) => `
+      <div class="ph" data-i="${i}"><img src="${h(p.thumb || p.url)}" loading="lazy" alt=""><div class="cap"><b>${h(p.player)}</b>${h(p.clue)}<br><span>w/ ${h(p.witness)} · ${fmt(p.at)}</span></div></div>`).join("");
+    document.querySelectorAll(".ph").forEach((el) => el.onclick = () => {
+      const p = d.items[+el.dataset.i];
+      $("#light").innerHTML = `<img src="${h(p.url)}" alt=""><p><b>${h(p.player)}</b> — ${h(p.clue)}<br>with ${h(p.witness)} · ${fmt(p.at)}</p>`;
+      $("#light").classList.add("open");
+    });
+  }
+  $("#light").onclick = () => $("#light").classList.remove("open");
+
+  // ---- host ----
+  $("#pin-go").onclick = async () => {
+    state.pin = $("#pin").value.trim();
+    try { await loadHost(); sessionStorage.setItem("bingo:pin", state.pin); }
+    catch (e) { state.pin = ""; $("#pin-err").textContent = e.message; }
+  };
+  let hostCfg = null;
+  async function loadHost() {
+    const d = await api("/api/host/config");
+    hostCfg = d.cfg;
+    $("#host-login").style.display = "none";
+    const host = $("#host"); host.style.display = "block";
+    const short = Object.entries(d.usable).filter(([, n]) => n < d.need);
+    host.innerHTML = `
+      <div class="card">
+        <div class="switch"><div><b>Game ${d.cfg.locked ? "locked" : "open"}</b><div class="hint" style="margin:2px 0 0">Locked stops everyone from marking.</div></div>
+          <button class="btn sm ${d.cfg.locked ? "" : "ghost"}" id="lock">${d.cfg.locked ? "Unlock" : "Lock"}</button></div>
+      </div>
+      <div class="card">
+        <h3 style="font-size:17px">Standings</h3>
+        ${d.leaderboard.map((r) => `<div class="row" style="flex-wrap:wrap"><div class="name">${h(r.player)} ${d.claimed[r.player] === "password" ? "🔑" : d.claimed[r.player] ? "🔒" : ""} ${r.bingoAt ? `<span class="pill gold">BINGO ${fmt(r.bingoAt)}</span>` : ""}</div><div class="meta">${r.marked}/15 · usable: <span class="${d.usable[r.player] < d.need ? "warn" : ""}">${d.usable[r.player]}</span></div><div style="display:flex;gap:6px;width:100%"><button class="btn sm ghost" data-viewboard="${h(r.player)}">View board</button>${d.claimed[r.player] ? `<button class="btn sm ghost" data-release="${h(r.player)}">Release lock</button>` : ""}<button class="btn sm ghost" data-reset="${h(r.player)}">Reset marks</button></div></div>`).join("")}
+        <p class="hint">🔒 = locked with Face ID, 🔑 = locked with a password. Release it if someone switches phones or forgets their password; they pick their name again.</p>
+        ${short.length ? `<p class="hint warn">Short on clues (need ${d.need}): ${short.map(([p, n]) => `${h(p)} (${n})`).join(", ")}. Add clues that aren't about them.</p>` : ""}
+      </div>
+      <div class="card">
+        <h3 style="font-size:17px">Recent marks</h3>
+        ${Object.entries(d.marks).flatMap(([p, ms]) => ms.map((m) => ({ p, ...m }))).sort((a, b) => b.at - a.at).slice(0, 25).map((m) => `<div class="row"><div style="flex:1"><div class="name">${h(m.p)}</div><div class="meta">${h(m.clue)} · w/ ${h(m.witness)} · ${fmt(m.at)}</div></div><button class="x" data-del="${h(m.p)}|${h(m.id)}" title="Remove">✕</button></div>`).join("") || `<p class="hint">Nothing yet.</p>`}
+      </div>
+      <div class="card">
+        <h3 style="font-size:17px">Players</h3>
+        <p class="hint">One per line. Removing someone drops their board.</p>
+        <textarea id="players" style="min-height:120px;margin-top:8px">${h(d.cfg.players.join("\n"))}</textarea>
+      </div>
+      <div class="card">
+        <h3 style="font-size:17px">Clues <span class="pill" id="cluecount">${d.cfg.clues.length}</span></h3>
+        <p class="hint">Tap a name chip to say a clue is about that person; they'll never see it on their board. Names are auto-tagged from the text when you add a clue.</p>
+        <div id="clues"></div>
+        <button class="btn ghost" id="addclue">+ Add clue</button>
+        <label class="field">Or paste a bunch (one per line)</label>
+        <textarea id="bulk" placeholder="Paste new clues here" style="min-height:70px"></textarea>
+        <button class="btn ghost" id="bulkadd">Add pasted clues</button>
+      </div>
+      <div class="card">
+        <h3 style="font-size:17px">Save</h3>
+        <p class="hint">Saving keeps everyone's current board layout and marks. Regenerate reshuffles every board; marks on clues that stay on a board survive.</p>
+        <button class="btn" id="save">Save changes</button>
+        <button class="btn ghost" id="regen">Save + regenerate boards</button>
+        <button class="btn danger" id="resetall">Wipe all marks and photos</button>
+        <button class="btn danger" id="releaseall">Release everyone's locks</button>
+        <div class="err" id="herr"></div>
+      </div>`;
+    renderClues();
+    $("#lock").onclick = () => hostSave({ locked: !d.cfg.locked });
+    $("#save").onclick = () => hostSave(collect());
+    $("#regen").onclick = () => confirm("Reshuffle every board?") && hostSave({ ...collect(), regenerate: true });
+    $("#resetall").onclick = () => confirm("Delete every mark and photo for everyone?") && api("/api/host/reset", { method: "POST", body: JSON.stringify({ player: "*" }) }).then(loadHost);
+    $("#releaseall").onclick = () => confirm("Release every name? Everyone will have to pick their name and lock it again.") && api("/api/host/release", { method: "POST", body: JSON.stringify({ player: "*" }) }).then(loadHost);
+    host.querySelectorAll("[data-reset]").forEach((b) => b.onclick = () => confirm(`Reset ${b.dataset.reset}'s marks?`) && api("/api/host/reset", { method: "POST", body: JSON.stringify({ player: b.dataset.reset }) }).then(loadHost));
+    host.querySelectorAll("[data-release]").forEach((b) => b.onclick = () => confirm(`Release ${b.dataset.release}'s lock? They'll need to pick their name again.`) && api("/api/host/release", { method: "POST", body: JSON.stringify({ player: b.dataset.release }) }).then(loadHost));
+    host.querySelectorAll("[data-viewboard]").forEach((b) => b.onclick = async () => { state.viewAs = b.dataset.viewboard; await loadBoard(); show("board"); });
+    host.querySelectorAll("[data-del]").forEach((b) => b.onclick = () => { const [p, id] = b.dataset.del.split("|"); api(`/api/mark?player=${encodeURIComponent(p)}&clue=${encodeURIComponent(id)}`, { method: "DELETE" }).then(loadHost); });
+    $("#addclue").onclick = () => { hostCfg.clues.push({ id: null, text: "", about: [] }); renderClues(); const t = document.querySelector("#clues .clue-row:last-child textarea"); if (t) t.focus(); };
+    $("#bulkadd").onclick = async () => {
+      const lines = $("#bulk").value.split("\n").map((s) => s.trim()).filter(Boolean);
+      for (const text of lines) { const r = await api("/api/host/autotag", { method: "POST", body: JSON.stringify({ text }) }); hostCfg.clues.push({ id: null, text, about: r.about }); }
+      $("#bulk").value = ""; renderClues();
+    };
+  }
+  function renderClues() {
+    $("#cluecount").textContent = hostCfg.clues.length;
+    $("#clues").innerHTML = hostCfg.clues.map((c, i) => `
+      <div class="clue-row" data-i="${i}">
+        <textarea data-text>${h(c.text)}</textarea>
+        <button class="x" data-rm title="Delete">✕</button>
+        <div class="about">${hostCfg.players.map((p) => `<button class="chip${c.about.includes(p) ? " on" : ""}" data-chip="${h(p)}">${h(p)}</button>`).join("")}</div>
+      </div>`).join("");
+    document.querySelectorAll("#clues .clue-row").forEach((row) => {
+      const i = +row.dataset.i;
+      row.querySelector("[data-text]").oninput = (e) => { hostCfg.clues[i].text = e.target.value; };
+      row.querySelector("[data-text]").onblur = async (e) => {
+        if (!hostCfg.clues[i].id && hostCfg.clues[i].about.length === 0 && e.target.value.trim()) {
+          const r = await api("/api/host/autotag", { method: "POST", body: JSON.stringify({ text: e.target.value }) });
+          hostCfg.clues[i].about = r.about; renderClues();
+        }
+      };
+      row.querySelector("[data-rm]").onclick = () => { hostCfg.clues.splice(i, 1); renderClues(); };
+      row.querySelectorAll("[data-chip]").forEach((ch) => ch.onclick = () => {
+        const a = hostCfg.clues[i].about, p = ch.dataset.chip;
+        a.includes(p) ? a.splice(a.indexOf(p), 1) : a.push(p);
+        ch.classList.toggle("on");
+      });
+    });
+  }
+  function collect() {
+    return { players: $("#players").value.split("\n").map((s) => s.trim()).filter(Boolean), clues: hostCfg.clues.filter((c) => c.text.trim()) };
+  }
+  async function hostSave(body) {
+    $("#herr").textContent = "";
+    try { await api("/api/host/config", { method: "POST", body: JSON.stringify(body) }); await loadHost(); window.scrollTo(0, 0); }
+    catch (e) { $("#herr").textContent = e.message; }
+  }
+
+  // ---- confetti ----
+  function confetti() {
+    const cv = $("#confetti"), ctx = cv.getContext("2d");
+    cv.width = innerWidth; cv.height = innerHeight;
+    const ps = [...Array(160)].map(() => ({ x: Math.random() * cv.width, y: -20 - Math.random() * cv.height * .5, r: 4 + Math.random() * 6, c: ["#f5c242", "#ff8a5c", "#34d399", "#60a5fa", "#f472b6"][Math.random() * 5 | 0], v: 2 + Math.random() * 4, w: Math.random() * 6.28, s: Math.random() * .2 - .1 }));
+    let t = 0;
+    (function frame() {
+      ctx.clearRect(0, 0, cv.width, cv.height);
+      for (const p of ps) { p.y += p.v; p.x += Math.sin(p.w += p.s) * 1.5; ctx.fillStyle = p.c; ctx.fillRect(p.x, p.y, p.r, p.r * 1.6); }
+      if (++t < 220) requestAnimationFrame(frame); else ctx.clearRect(0, 0, cv.width, cv.height);
+    })();
+  }
+
+  // ---- boot ----
+  loadBoard().then(() => show(state.player ? "board" : "pick")).catch((e) => { $("#grid").innerHTML = `<p class="note">${h(e.message)}</p>`; show("board"); });
+  setInterval(() => { if (document.hidden) return; if (state.view === "board" && state.player && !$("#sheet").classList.contains("open")) loadBoard(); if (state.view === "standings") loadStandings(); }, 20000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && state.view === "board") loadBoard(); });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,345 @@
+{
+ "title": "Phillip's Bachelor Party Bingo",
+ "players": [
+  "Phillip",
+  "John",
+  "Jay",
+  "Karthik",
+  "Kaushik",
+  "Atharva",
+  "Aneesh",
+  "Brendan",
+  "Sanket",
+  "Rahul",
+  "Pranay",
+  "Diante",
+  "Kush P",
+  "Kush G"
+ ],
+ "clues": [
+  {
+   "id": "c1",
+   "text": "Someone spills a drink",
+   "about": []
+  },
+  {
+   "id": "c2",
+   "text": "Karthik and Jay take their shirts off and flex at each other",
+   "about": [
+    "Jay",
+    "Karthik"
+   ]
+  },
+  {
+   "id": "c3",
+   "text": "Kaushik requests a Kanye song",
+   "about": [
+    "Kaushik"
+   ]
+  },
+  {
+   "id": "c4",
+   "text": "Any 2 guys go to the bathroom together",
+   "about": []
+  },
+  {
+   "id": "c5",
+   "text": "Jay mentions winning fantasy",
+   "about": [
+    "Jay"
+   ]
+  },
+  {
+   "id": "c6",
+   "text": "Atharva says “dude oh yeah” or “dude ya”",
+   "about": [
+    "Atharva"
+   ]
+  },
+  {
+   "id": "c7",
+   "text": "Aneesh says “oh I’m an idiot”",
+   "about": [
+    "Aneesh"
+   ]
+  },
+  {
+   "id": "c8",
+   "text": "Karthik turns into satan at night",
+   "about": [
+    "Karthik"
+   ]
+  },
+  {
+   "id": "c9",
+   "text": "Group of people will stay up until sunrise drinking",
+   "about": []
+  },
+  {
+   "id": "c10",
+   "text": "Someone will jump into the lake",
+   "about": []
+  },
+  {
+   "id": "c11",
+   "text": "Jay will lose the ability to see at some point",
+   "about": [
+    "Jay"
+   ]
+  },
+  {
+   "id": "c12",
+   "text": "Jay will start mumble rapping songs that he knows",
+   "about": [
+    "Jay"
+   ]
+  },
+  {
+   "id": "c13",
+   "text": "Brendan will make a pun about Columbus, Ohio",
+   "about": [
+    "Brendan"
+   ]
+  },
+  {
+   "id": "c14",
+   "text": "Rahul talks about his recent brawling escapades",
+   "about": [
+    "Rahul"
+   ]
+  },
+  {
+   "id": "c15",
+   "text": "Brendan makes a dad joke/pun",
+   "about": [
+    "Brendan"
+   ]
+  },
+  {
+   "id": "c16",
+   "text": "Sanket says he wants to play League",
+   "about": [
+    "Sanket"
+   ]
+  },
+  {
+   "id": "c17",
+   "text": "Atharva talks about his Muse agent",
+   "about": [
+    "Atharva"
+   ]
+  },
+  {
+   "id": "c18",
+   "text": "Kush P talks about how shit the Aggies are doing",
+   "about": [
+    "Kush P"
+   ]
+  },
+  {
+   "id": "c19",
+   "text": "Kush G talks about AI",
+   "about": [
+    "Kush G"
+   ]
+  },
+  {
+   "id": "c20",
+   "text": "Jay talks about AI",
+   "about": [
+    "Jay"
+   ]
+  },
+  {
+   "id": "c21",
+   "text": "Jay holds onto someone’s vape for longer than 10 mins",
+   "about": [
+    "Jay"
+   ]
+  },
+  {
+   "id": "c22",
+   "text": "Karthik and Philip do somn gay (eg grinding on each other)",
+   "about": [
+    "Phillip",
+    "Karthik"
+   ]
+  },
+  {
+   "id": "c23",
+   "text": "Jay/Karthik initiates arm wrestling",
+   "about": [
+    "Jay",
+    "Karthik"
+   ]
+  },
+  {
+   "id": "c24",
+   "text": "Philip humps someone",
+   "about": [
+    "Phillip"
+   ]
+  },
+  {
+   "id": "c25",
+   "text": "John becomes shot girl",
+   "about": [
+    "John"
+   ]
+  },
+  {
+   "id": "c26",
+   "text": "Aneesh says baby girl",
+   "about": [
+    "Aneesh"
+   ]
+  },
+  {
+   "id": "c27",
+   "text": "Philip burps",
+   "about": [
+    "Phillip"
+   ]
+  },
+  {
+   "id": "c28",
+   "text": "Philip tries to wrestle someone (distinct from his gaytivities with Karthik)",
+   "about": [
+    "Phillip",
+    "Karthik"
+   ]
+  },
+  {
+   "id": "c29",
+   "text": "Pranay and Aneesh talk abt girls",
+   "about": [
+    "Aneesh",
+    "Pranay"
+   ]
+  },
+  {
+   "id": "c30",
+   "text": "Kush G loses his watch at some point",
+   "about": [
+    "Kush G"
+   ]
+  },
+  {
+   "id": "c31",
+   "text": "Diante gives Karthik the pass cuz it just makes sense",
+   "about": [
+    "Karthik",
+    "Diante"
+   ]
+  },
+  {
+   "id": "c32",
+   "text": "Philip tells everyone he loves them",
+   "about": [
+    "Phillip"
+   ]
+  },
+  {
+   "id": "c33",
+   "text": "Rahul drops the hard R",
+   "about": [
+    "Rahul"
+   ]
+  },
+  {
+   "id": "c34",
+   "text": "Kush P mentions the Spurs dynasty",
+   "about": [
+    "Kush P"
+   ]
+  },
+  {
+   "id": "c35",
+   "text": "Rahul claims he won the fight (that he lost)",
+   "about": [
+    "Rahul"
+   ]
+  },
+  {
+   "id": "c36",
+   "text": "Karthik will start humping the couch and misc items",
+   "about": [
+    "Karthik"
+   ]
+  },
+  {
+   "id": "c37",
+   "text": "Rahul switching the vape to turbo",
+   "about": [
+    "Rahul"
+   ]
+  },
+  {
+   "id": "c38",
+   "text": "Diante ask/talking about where the hoes at",
+   "about": [
+    "Diante"
+   ]
+  },
+  {
+   "id": "c39",
+   "text": "Sanket or Rahul say Undiwalla or undiswamy",
+   "about": [
+    "Sanket",
+    "Rahul"
+   ]
+  },
+  {
+   "id": "c40",
+   "text": "Kaushik saying that you’re not as bad as Sunny",
+   "about": [
+    "Kaushik"
+   ]
+  },
+  {
+   "id": "c41",
+   "text": "Philly giving someone his famous drunk serious talk (really up close and personal)",
+   "about": [
+    "Phillip"
+   ]
+  },
+  {
+   "id": "c42",
+   "text": "Multiple ppl getting shirtless for no reason",
+   "about": []
+  },
+  {
+   "id": "c43",
+   "text": "Spanky says kys",
+   "about": []
+  },
+  {
+   "id": "c44",
+   "text": "Sanket mentions Jamyr Gibbs",
+   "about": [
+    "Sanket"
+   ]
+  },
+  {
+   "id": "c45",
+   "text": "Kaushik throws gang signs",
+   "about": [
+    "Kaushik"
+   ]
+  },
+  {
+   "id": "c46",
+   "text": "John does his hand shaking emote",
+   "about": [
+    "John"
+   ]
+  },
+  {
+   "id": "c47",
+   "text": "Kush G makes an age joke",
+   "about": [
+    "Kush G"
+   ]
+  }
+ ]
+}

@@ -1,0 +1,311 @@
+{
+  "title": "TEST Bingo (dummy data)",
+  "players": [
+    "Phillip",
+    "John",
+    "Jay",
+    "Karthik",
+    "Kaushik",
+    "Atharva",
+    "Aneesh",
+    "Brendan",
+    "Sanket",
+    "Rahul",
+    "Pranay",
+    "Diante",
+    "Kush P",
+    "Kush G"
+  ],
+  "clues": [
+    {
+      "id": "d1",
+      "text": "Someone spills a drink",
+      "about": []
+    },
+    {
+      "id": "d2",
+      "text": "Group photo takes 5+ tries",
+      "about": []
+    },
+    {
+      "id": "d3",
+      "text": "Someone falls asleep before midnight",
+      "about": []
+    },
+    {
+      "id": "d4",
+      "text": "Someone orders food after 2am",
+      "about": []
+    },
+    {
+      "id": "d5",
+      "text": "Someone loses their phone",
+      "about": []
+    },
+    {
+      "id": "d6",
+      "text": "Someone FaceTimes their partner",
+      "about": []
+    },
+    {
+      "id": "d7",
+      "text": "Someone says best weekend ever",
+      "about": []
+    },
+    {
+      "id": "d8",
+      "text": "Someone is late to departure",
+      "about": []
+    },
+    {
+      "id": "d9",
+      "text": "Someone jumps in the lake",
+      "about": []
+    },
+    {
+      "id": "d10",
+      "text": "Someone starts a sentence with I am not even drunk but",
+      "about": []
+    },
+    {
+      "id": "d11",
+      "text": "Two people argue about music",
+      "about": []
+    },
+    {
+      "id": "d12",
+      "text": "Someone cooks breakfast",
+      "about": []
+    },
+    {
+      "id": "d13",
+      "text": "Someone naps in a weird spot",
+      "about": []
+    },
+    {
+      "id": "d14",
+      "text": "Someone sings badly",
+      "about": []
+    },
+    {
+      "id": "d15",
+      "text": "Someone tells the same story twice",
+      "about": []
+    },
+    {
+      "id": "d16",
+      "text": "Someone cannonballs",
+      "about": []
+    },
+    {
+      "id": "d100",
+      "text": "Phillip does something funny",
+      "about": [
+        "Phillip"
+      ]
+    },
+    {
+      "id": "d200",
+      "text": "Phillip and John arm wrestle",
+      "about": [
+        "Phillip",
+        "John"
+      ]
+    },
+    {
+      "id": "d101",
+      "text": "John does something funny",
+      "about": [
+        "John"
+      ]
+    },
+    {
+      "id": "d201",
+      "text": "John and Jay arm wrestle",
+      "about": [
+        "John",
+        "Jay"
+      ]
+    },
+    {
+      "id": "d102",
+      "text": "Jay does something funny",
+      "about": [
+        "Jay"
+      ]
+    },
+    {
+      "id": "d202",
+      "text": "Jay and Karthik arm wrestle",
+      "about": [
+        "Jay",
+        "Karthik"
+      ]
+    },
+    {
+      "id": "d103",
+      "text": "Karthik does something funny",
+      "about": [
+        "Karthik"
+      ]
+    },
+    {
+      "id": "d203",
+      "text": "Karthik and Kaushik arm wrestle",
+      "about": [
+        "Karthik",
+        "Kaushik"
+      ]
+    },
+    {
+      "id": "d104",
+      "text": "Kaushik does something funny",
+      "about": [
+        "Kaushik"
+      ]
+    },
+    {
+      "id": "d204",
+      "text": "Kaushik and Atharva arm wrestle",
+      "about": [
+        "Kaushik",
+        "Atharva"
+      ]
+    },
+    {
+      "id": "d105",
+      "text": "Atharva does something funny",
+      "about": [
+        "Atharva"
+      ]
+    },
+    {
+      "id": "d205",
+      "text": "Atharva and Aneesh arm wrestle",
+      "about": [
+        "Atharva",
+        "Aneesh"
+      ]
+    },
+    {
+      "id": "d106",
+      "text": "Aneesh does something funny",
+      "about": [
+        "Aneesh"
+      ]
+    },
+    {
+      "id": "d206",
+      "text": "Aneesh and Brendan arm wrestle",
+      "about": [
+        "Aneesh",
+        "Brendan"
+      ]
+    },
+    {
+      "id": "d107",
+      "text": "Brendan does something funny",
+      "about": [
+        "Brendan"
+      ]
+    },
+    {
+      "id": "d207",
+      "text": "Brendan and Sanket arm wrestle",
+      "about": [
+        "Brendan",
+        "Sanket"
+      ]
+    },
+    {
+      "id": "d108",
+      "text": "Sanket does something funny",
+      "about": [
+        "Sanket"
+      ]
+    },
+    {
+      "id": "d208",
+      "text": "Sanket and Rahul arm wrestle",
+      "about": [
+        "Sanket",
+        "Rahul"
+      ]
+    },
+    {
+      "id": "d109",
+      "text": "Rahul does something funny",
+      "about": [
+        "Rahul"
+      ]
+    },
+    {
+      "id": "d209",
+      "text": "Rahul and Pranay arm wrestle",
+      "about": [
+        "Rahul",
+        "Pranay"
+      ]
+    },
+    {
+      "id": "d110",
+      "text": "Pranay does something funny",
+      "about": [
+        "Pranay"
+      ]
+    },
+    {
+      "id": "d210",
+      "text": "Pranay and Diante arm wrestle",
+      "about": [
+        "Pranay",
+        "Diante"
+      ]
+    },
+    {
+      "id": "d111",
+      "text": "Diante does something funny",
+      "about": [
+        "Diante"
+      ]
+    },
+    {
+      "id": "d211",
+      "text": "Diante and Kush P arm wrestle",
+      "about": [
+        "Diante",
+        "Kush P"
+      ]
+    },
+    {
+      "id": "d112",
+      "text": "Kush P does something funny",
+      "about": [
+        "Kush P"
+      ]
+    },
+    {
+      "id": "d212",
+      "text": "Kush P and Kush G arm wrestle",
+      "about": [
+        "Kush P",
+        "Kush G"
+      ]
+    },
+    {
+      "id": "d113",
+      "text": "Kush G does something funny",
+      "about": [
+        "Kush G"
+      ]
+    },
+    {
+      "id": "d213",
+      "text": "Kush G and Phillip arm wrestle",
+      "about": [
+        "Kush G",
+        "Phillip"
+      ]
+    }
+  ]
+}
