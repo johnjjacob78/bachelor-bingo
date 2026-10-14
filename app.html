@@ -36,7 +36,6 @@
           padding: 8px 7px; display: flex; align-items: center; justify-content: center; text-align: center;
           font-size: 11.5px; line-height: 1.2; font-weight: 500; overflow: hidden; transition: transform .08s; }
   .cell:active { transform: scale(.96); }
-  .cell.free { background: var(--gold); color: var(--gold-ink); font-family: "Bricolage Grotesque", sans-serif; font-weight: 800; font-size: 18px; }
   .cell.blank { color: var(--muted); font-style: italic; }
   .cell.marked { background: var(--cell-marked); border-color: #3fa36c; color: #fff; }
   .cell.marked img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .45; }
@@ -233,14 +232,13 @@
   function renderBoard(d) {
     const line = new Set(d.bingo?.line || d.line || []);
     $("#grid").innerHTML = d.board.map((c) => {
-      if (c.free) return `<div class="cell free${line.has(c.cell) ? " inline" : ""}">FREE</div>`;
       if (c.blank) return `<div class="cell blank">no clue left for you</div>`;
       const marked = !!c.mark;
       return `<div class="cell${marked ? " marked" : ""}${line.has(c.cell) ? " inline" : ""}" data-id="${h(c.id)}">${marked ? `<img src="/photo/${encodeURIComponent(c.mark.thumb || c.mark.key)}" alt="" loading="lazy">` : ""}<span>${h(c.text)}</span></div>`;
     }).join("");
     document.querySelectorAll("#grid .cell[data-id]").forEach((el) => el.onclick = () => openCell(el.dataset.id));
     const marked = d.board.filter((c) => c.mark).length;
-    $("#progress").textContent = `${marked} of 15 marked · ${d.clueCount} clues in play`;
+    $("#progress").textContent = `${marked} of 16 marked · ${d.clueCount} clues in play`;
     $("#lockpill").innerHTML = d.locked ? `<span class="pill red">Locked</span>` : "";
     const firsts = Object.entries(d.bingos).sort((a, b) => a[1].at - b[1].at);
     let banner = "";
@@ -365,9 +363,9 @@
         <div class="rank">${i + 1}</div>
         <div style="flex:1">
           <div class="name">${h(r.player)} ${r.bingoAt ? `<span class="pill gold">BINGO ${fmt(r.bingoAt)}</span>` : ""}</div>
-          <div class="bar"><i style="width:${Math.round(r.marked / 15 * 100)}%"></i></div>
+          <div class="bar"><i style="width:${Math.round(r.marked / 16 * 100)}%"></i></div>
         </div>
-        <div class="meta">${r.marked}/15</div>
+        <div class="meta">${r.marked}/16</div>
       </div>`).join("");
   }
 
@@ -405,7 +403,7 @@
       </div>
       <div class="card">
         <h3 style="font-size:17px">Standings</h3>
-        ${d.leaderboard.map((r) => `<div class="row" style="flex-wrap:wrap"><div class="name">${h(r.player)} ${d.claimed[r.player] ? "🔒" : ""} ${r.bingoAt ? `<span class="pill gold">BINGO ${fmt(r.bingoAt)}</span>` : ""}</div><div class="meta">${r.marked}/15 · usable: <span class="${d.usable[r.player] < d.need ? "warn" : ""}">${d.usable[r.player]}</span></div><div style="display:flex;gap:6px;width:100%"><button class="btn sm ghost" data-viewboard="${h(r.player)}">View board</button>${d.claimed[r.player] ? `<button class="btn sm ghost" data-release="${h(r.player)}">Release name</button>` : ""}<button class="btn sm ghost" data-reset="${h(r.player)}">Reset marks</button></div></div>`).join("")}
+        ${d.leaderboard.map((r) => `<div class="row" style="flex-wrap:wrap"><div class="name">${h(r.player)} ${d.claimed[r.player] ? "🔒" : ""} ${r.bingoAt ? `<span class="pill gold">BINGO ${fmt(r.bingoAt)}</span>` : ""}</div><div class="meta">${r.marked}/16 · usable: <span class="${d.usable[r.player] < d.need ? "warn" : ""}">${d.usable[r.player]}</span></div><div style="display:flex;gap:6px;width:100%"><button class="btn sm ghost" data-viewboard="${h(r.player)}">View board</button>${d.claimed[r.player] ? `<button class="btn sm ghost" data-release="${h(r.player)}">Release name</button>` : ""}<button class="btn sm ghost" data-reset="${h(r.player)}">Reset marks</button></div></div>`).join("")}
         <p class="hint">🔒 = name is locked to a phone. Release it if someone switches phones, clears their browser, or a name got tapped by mistake; then they tap their name again.</p>
         ${short.length ? `<p class="hint warn">Short on clues (need ${d.need}): ${short.map(([p, n]) => `${h(p)} (${n})`).join(", ")}. Add clues that aren't about them.</p>` : ""}
       </div>

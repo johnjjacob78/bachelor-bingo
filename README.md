@@ -1,6 +1,6 @@
 # Bachelor Bingo
 
-Cloudflare Worker. Everyone opens one link and taps their name; that phone then owns the name, and everyone else sees it locked. Each player gets a 4x4 board with one free square and no clues about themselves. Marking a square requires a photo with a witness; photos go to the Photos wall. First bingo wins.
+Cloudflare Worker. Everyone opens one link and taps their name; that phone then owns the name, and everyone else sees it locked. Each player gets a 4x4 board of 16 clues (no free square), none of them about themselves. Marking a square requires a photo with a witness; photos go to the Photos wall. First bingo wins.
 
 - Game state: KV namespace `bachelor-bingo`
 - Photos: R2 bucket `bachelor-bingo-photos`

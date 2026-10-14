@@ -65,9 +65,9 @@ with sync_playwright() as p:
     # ---------- 3. Board render ----------
     cells = A.locator("#grid .cell").count()
     check("board: 16 cells", cells == 16)
-    check("board: FREE square at row 2 col 2", A.evaluate("document.querySelectorAll('#grid .cell')[5].classList.contains('free')"))
-    check("board: 15 clue cells", A.locator("#grid .cell[data-id]").count() == 15)
-    check("board: progress text", "0 of 15 marked" in A.inner_text("#progress"))
+    check("board: no free square", A.locator("#grid .cell.free").count() == 0 and "FREE" not in A.inner_text("#grid"))
+    check("board: 16 clue cells", A.locator("#grid .cell[data-id]").count() == 16)
+    check("board: progress text", "0 of 16 marked" in A.inner_text("#progress"))
     check("board: no horizontal scroll", A.evaluate("document.documentElement.scrollWidth <= window.innerWidth"))
     A.screenshot(path=f"{SHOTS}/t_board.png")
     # self-clue rule for all players
@@ -78,8 +78,9 @@ with sync_playwright() as p:
         ids = [c["id"] for c in d["board"] if c.get("id")]
         about = {c["id"]: c["about"] for c in cfg["cfg"]["clues"]}
         if any(pl in about.get(i, []) for i in ids): ok_all = False; bad.append(pl)
+        if len(ids) != 16: ok_all = False; bad.append(pl + f":{len(ids)} clues")
         if len(set(ids)) != len(ids): ok_all = False; bad.append(pl + ":dup")
-    check("board: no player has a clue about themselves, no duplicate clues", ok_all, str(bad))
+    check("board: every player has 16 clues, none about themselves, no duplicates", ok_all, str(bad))
     check("board: deterministic", host("/api/state?player=Jay")[1]["board"] == host("/api/state?player=Jay")[1]["board"])
 
     # ---------- 4. Second phone ----------
@@ -108,7 +109,7 @@ with sync_playwright() as p:
     check("mark: enabled with witness+photo", not A.is_disabled("#mark"))
     A.click("#mark"); A.wait_for_selector("#sheet:not(.open)"); A.wait_for_selector(f"#grid .cell[data-id='{first_id}'].marked")
     check("mark: cell marked with photo", A.locator(f"#grid .cell[data-id='{first_id}'].marked img").count() == 1)
-    check("mark: progress 1 of 15", "1 of 15" in A.inner_text("#progress"))
+    check("mark: progress 1 of 16", "1 of 16" in A.inner_text("#progress"))
     s, m = host("/api/host/config")
     mk = m["marks"]["John"][0]
     check("mark: server recorded witness", mk["witness"] == "Jay")
@@ -135,6 +136,7 @@ with sync_playwright() as p:
         A.select_option("#witness", "Jay"); A.set_input_files("#file", {"name": f"p{i}.jpg", "mimeType": "image/jpeg", "buffer": jpg(f"row {i}")})
         A.wait_for_function("!document.querySelector('#mark').disabled"); A.click("#mark"); A.wait_for_selector("#sheet:not(.open)")
         A.wait_for_selector(f"#grid .cell[data-id='{cid}'].marked")
+        if i == 2: check("bingo: 3 in a row is not bingo (no free square)", "BINGO" not in A.inner_text("#banner") and "John" not in host("/api/state")[1]["bingos"])
     # large photo survives at full res
     big_cell = A.evaluate("[...document.querySelectorAll('#grid .cell[data-id]:not(.marked)')][0].dataset.id")
     A.click(f"#grid .cell[data-id='{big_cell}']"); A.wait_for_selector("#sheet.open #witness"); A.select_option("#witness", "Jay")
@@ -157,7 +159,7 @@ with sync_playwright() as p:
     rows = A.locator("#standings .row").count()
     check("standings: 14 rows", rows == 14)
     check("standings: John first with BINGO pill", A.locator("#standings .row").first.inner_text().startswith("1") and "BINGO" in A.locator("#standings .row").first.inner_text())
-    check("standings: John shows 4/15", "4/15" in A.locator("#standings .row").first.inner_text())
+    check("standings: John shows 4/16", "4/16" in A.locator("#standings .row").first.inner_text())
     A.screenshot(path=f"{SHOTS}/t_standings.png")
 
     # ---------- 9. Photos ----------
@@ -227,7 +229,7 @@ with sync_playwright() as p:
     Bp.reload(); Bp.wait_for_selector("#names button")
     check("host: released Jay is signed out on next load", Bp.evaluate("document.querySelector('.view.active').id") == "view-pick")
     # reset John
-    A.click("[data-reset='John']"); A.wait_for_function("document.querySelector(\"[data-reset='John']\").closest('.row').innerText.includes('0/15')")
+    A.click("[data-reset='John']"); A.wait_for_function("document.querySelector(\"[data-reset='John']\").closest('.row').innerText.includes('0/16')")
     check("host: reset John clears marks and bingo", "BINGO" not in A.locator("[data-reset='John']").locator("xpath=ancestor::div[contains(@class,'row')]").inner_text())
     # players edit
     A.fill("#players", "\n".join(cfg["cfg"]["players"] + ["Zed"])); A.click("#save"); A.wait_for_function("document.querySelector('#players').value.includes('Zed')")

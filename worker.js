@@ -4,7 +4,9 @@ import { clearSession, readSession, claimedPlayers, releasePlayer, claimPlayer, 
 
 const SIZE = 4;
 const CELLS = SIZE * SIZE;
-const FREE = 5; // row 2, col 2 — same spot on every board
+// Boards have no free square: all 16 cells are clues. Bump BOARD_FORMAT whenever the layout
+// changes, so boards saved in KV under an older layout are rebuilt instead of reused.
+const BOARD_FORMAT = 2;
 const MAX_PHOTO = 25 * 1024 * 1024;
 
 // ---------- helpers ----------
@@ -61,20 +63,16 @@ function usableClues(cfg, player) {
 
 function buildBoard(cfg, player) {
   const rand = rng(hash32(player + "|" + cfg.version));
-  const picks = shuffle(usableClues(cfg, player).map((c) => c.id), rand).slice(0, CELLS - 1);
+  const picks = shuffle(usableClues(cfg, player).map((c) => c.id), rand).slice(0, CELLS);
   const board = [];
-  let k = 0;
-  for (let i = 0; i < CELLS; i++) {
-    if (i === FREE) board.push("FREE");
-    else board.push(picks[k++] ?? null);
-  }
+  for (let i = 0; i < CELLS; i++) board.push(picks[i] ?? null);
   return board;
 }
 
 function buildBoards(cfg) {
   const boards = {};
   for (const p of cfg.players) boards[p] = buildBoard(cfg, p);
-  return { version: cfg.version, boards };
+  return { version: cfg.version, format: BOARD_FORMAT, boards };
 }
 
 const LINES = (() => {
@@ -87,7 +85,7 @@ const LINES = (() => {
 })();
 
 function findBingo(board, marks) {
-  const marked = board.map((id, i) => i === FREE || (id && marks[id]));
+  const marked = board.map((id) => !!(id && marks[id]));
   for (const line of LINES) if (line.every((i) => marked[i])) return line;
   return null;
 }
@@ -116,7 +114,7 @@ async function loadConfig(env) {
 
 async function loadBoards(env, cfg) {
   let b = await env.KV.get("boards", "json");
-  if (!b || b.version !== cfg.version) {
+  if (!b || b.version !== cfg.version || b.format !== BOARD_FORMAT) {
     b = buildBoards(cfg);
     await env.KV.put("boards", JSON.stringify(b));
   }
@@ -169,7 +167,7 @@ function leaderboard(cfg, boards, marks, bingos) {
   const rows = cfg.players.map((p) => {
     const board = boards.boards[p] || [];
     const m = marks[p] || {};
-    const count = board.filter((id, i) => i !== FREE && id && m[id]).length;
+    const count = board.filter((id) => id && m[id]).length;
     return { player: p, marked: count, bingoAt: bingos[p]?.at || null, line: bingos[p]?.line || null };
   });
   rows.sort((a, b) => {
@@ -267,7 +265,6 @@ const worker = {
         const cm = clueMap(cfg);
         const marks = await loadMarks(env, player);
         const board = boards.boards[player].map((id, i) => {
-          if (i === FREE) return { cell: i, free: true };
           if (!id || !cm[id]) return { cell: i, blank: true };
           return { cell: i, id, text: cm[id].text, mark: marks[id] || null };
         });
@@ -383,7 +380,7 @@ const worker = {
             detail[p] = Object.entries(marks[p] || {}).map(([id, m]) => ({ id, clue: cm[id]?.text || "?", witness: m.witness, at: m.at }));
           }
           const claimed = await claimedPlayers(env, cfg.players);
-          return json({ cfg, usable, claimed, need: CELLS - 1, leaderboard: leaderboard(cfg, boards, marks, bingos), marks: detail });
+          return json({ cfg, usable, claimed, need: CELLS, leaderboard: leaderboard(cfg, boards, marks, bingos), marks: detail });
         }
 
         if (method === "POST" && path === "/api/host/release") {
