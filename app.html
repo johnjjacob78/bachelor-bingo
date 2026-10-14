@@ -85,6 +85,12 @@
   .row .meta { font-size: 12px; color: var(--muted); }
   .bar { height: 6px; background: var(--panel2); border-radius: 99px; overflow: hidden; margin-top: 6px; }
   .bar i { display: block; height: 100%; background: var(--green); }
+  .bar.line4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; background: none; height: 8px; }
+  .bar.line4 i { background: var(--panel2); border-radius: 99px; }
+  .bar.line4 i.on { background: var(--green); }
+  .bar.line4 i.on.hot { background: #ff8a5c; }
+  .bar.line4 i.on.won { background: var(--gold); }
+  .pill.hot { background: #3d2416; color: #ff8a5c; }
   .photos { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
   .ph { background: var(--panel); border-radius: 14px; overflow: hidden; border: 1px solid var(--line); }
   .ph img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; }
@@ -358,14 +364,16 @@
   // ---- standings ----
   async function loadStandings() {
     const d = await api("/api/leaderboard");
-    $("#standings").innerHTML = `<h2 style="font-size:20px;margin-bottom:6px">Standings</h2>` + d.rows.map((r, i) => `
+    const away = (r) => r.bingoAt ? "" : r.best === 3 ? `<span class="pill hot">1 away${r.close > 1 ? ` ×${r.close}` : ""}!</span>` : "";
+    $("#standings").innerHTML = `<h2 style="font-size:20px;margin-bottom:2px">Standings</h2>
+      <p class="hint" style="margin:0 0 6px">Bar = best line (row, column or diagonal). 4 in a line is bingo.</p>` + d.rows.map((r, i) => `
       <div class="row">
         <div class="rank">${i + 1}</div>
         <div style="flex:1">
-          <div class="name">${h(r.player)} ${r.bingoAt ? `<span class="pill gold">BINGO ${fmt(r.bingoAt)}</span>` : ""}</div>
-          <div class="bar"><i style="width:${Math.round(r.marked / 16 * 100)}%"></i></div>
+          <div class="name">${h(r.player)} ${r.bingoAt ? `<span class="pill gold">BINGO ${fmt(r.bingoAt)}</span>` : away(r)}</div>
+          <div class="bar line4" title="${r.best} of 4 in a line">${[0, 1, 2, 3].map((k) => `<i class="${k < (r.bingoAt ? 4 : r.best) ? "on" : ""}${r.bingoAt ? " won" : r.best === 3 ? " hot" : ""}"></i>`).join("")}</div>
         </div>
-        <div class="meta">${r.marked}/16</div>
+        <div class="meta" style="text-align:right"><b>${r.bingoAt ? 4 : r.best}/4</b><br><span style="font-size:11px">${r.marked} marked</span></div>
       </div>`).join("");
   }
 
@@ -407,7 +415,7 @@
       </div>
       <div class="card">
         <h3 style="font-size:17px">Standings</h3>
-        ${d.leaderboard.map((r) => `<div class="row" style="flex-wrap:wrap"><div class="name">${h(r.player)} ${d.claimed[r.player] ? "🔒" : ""} ${r.bingoAt ? `<span class="pill gold">BINGO ${fmt(r.bingoAt)}</span>` : ""}</div><div class="meta">${r.marked}/16 · usable: <span class="${d.usable[r.player] < d.need ? "warn" : ""}">${d.usable[r.player]}</span></div><div style="display:flex;gap:6px;width:100%"><button class="btn sm ghost" data-viewboard="${h(r.player)}">View board</button>${d.claimed[r.player] ? `<button class="btn sm ghost" data-release="${h(r.player)}">Release name</button>` : ""}<button class="btn sm ghost" data-reset="${h(r.player)}">Reset marks</button></div></div>`).join("")}
+        ${d.leaderboard.map((r) => `<div class="row" style="flex-wrap:wrap"><div class="name">${h(r.player)} ${d.claimed[r.player] ? "🔒" : ""} ${r.bingoAt ? `<span class="pill gold">BINGO ${fmt(r.bingoAt)}</span>` : ""}</div><div class="meta">best line ${r.bingoAt ? 4 : r.best}/4 · ${r.marked} marked · usable: <span class="${d.usable[r.player] < d.need ? "warn" : ""}">${d.usable[r.player]}</span></div><div style="display:flex;gap:6px;width:100%"><button class="btn sm ghost" data-viewboard="${h(r.player)}">View board</button>${d.claimed[r.player] ? `<button class="btn sm ghost" data-release="${h(r.player)}">Release name</button>` : ""}<button class="btn sm ghost" data-reset="${h(r.player)}">Reset marks</button></div></div>`).join("")}
         <p class="hint">🔒 = name is locked to a phone. Release it if someone switches phones, clears their browser, or a name got tapped by mistake; then they tap their name again.</p>
         ${short.length ? `<p class="hint warn">Short on clues (need ${d.need}): ${short.map(([p, n]) => `${h(p)} (${n})`).join(", ")}. Add clues that aren't about them.</p>` : ""}
       </div>
