@@ -3,7 +3,6 @@
 
 export const PLAYERS = [
   "Phillip", "John", "Jay", "Karthik", "Kaushik", "Atharva", "Aneesh",
-  "Brendan", "Sanket", "Rahul", "Pranay", "Diante", "Kush P", "Kush G",
 ];
 
 // Nicknames used in clues, so "about" tagging catches them.
@@ -19,7 +18,6 @@ export const ALIASES = {
   "Sanket": ["sanket", "spanky"],
   "Rahul": ["rahul"],
   "Pranay": ["pranay"],
-  "Diante": ["diante"],
   "Kush P": ["kush p"],
   "Kush G": ["kush g"],
 };
@@ -55,13 +53,11 @@ export const CLUES = [
   "Phillip tries to wrestle someone",
   "Pranay and Aneesh talk about girls",
   "Kush G loses his watch",
-  "Diante gives Karthik the pass (it just makes sense)",
   "Phillip tells everyone he loves them",
   "Kush P mentions the Spurs dynasty",
   "Rahul claims he won the fight (he lost)",
   "Karthik humps the couch or random objects",
   "Rahul switches the vape to turbo",
-  "Diante asks where the hoes at",
   "Sanket or Rahul says \"Undiwalla\" or \"Undiswamy\"",
   "Kaushik says \"you're not as bad as Sunny\"",
   "Phillip gives someone his drunk serious talk, up close",
@@ -71,7 +67,6 @@ export const CLUES = [
   "Kaushik throws gang signs",
   "John does his hand-shaking emote",
   "Kush G makes an age joke",
-  "Diante breaks out the baggie",
   "Someone loses their vape",
   "Phillip takes someone else's shirt off",
 ];
