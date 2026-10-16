@@ -3,6 +3,7 @@
 
 export const PLAYERS = [
   "Phillip", "John", "Jay", "Karthik", "Kaushik", "Atharva", "Aneesh",
+  "Brendan", "Sanket", "Rahul", "Pranay", "Diante", "Kush P", "Kush G",
 ];
 
 // Nicknames used in clues, so "about" tagging catches them.
@@ -18,6 +19,7 @@ export const ALIASES = {
   "Sanket": ["sanket", "spanky"],
   "Rahul": ["rahul"],
   "Pranay": ["pranay"],
+  "Diante": ["diante"],
   "Kush P": ["kush p"],
   "Kush G": ["kush g"],
 };
